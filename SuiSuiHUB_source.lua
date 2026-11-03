@@ -1105,7 +1105,7 @@ library.CreateWindow = function(self, name, hidebutton)
 					dropdown.ItemsFrame.ScrollingDirection = "Y";
 					dropdown.ItemsFrame.Visible = false;
 					dropdown.ItemsFrame.Size = UDim2.new(0, 0, 0, 0);
-					dropdown.ItemsFrame.CanvasSize = UDim2.fromOffset(dropdown.Main.AbsoluteSize.X, 0);
+					dropdown.ItemsFrame.CanvasSize = UDim2.fromOffset(0, 0);
 					dropdown.ListLayout = Instance.new("UIListLayout", dropdown.ItemsFrame);
 					dropdown.ListLayout.FillDirection = Enum.FillDirection.Vertical;
 					dropdown.ListLayout.SortOrder = Enum.SortOrder.LayoutOrder;
@@ -2364,7 +2364,7 @@ library.CreateWindow = function(self, name, hidebutton)
 					dropdown.ItemsFrame.ZIndex = 8;
 					dropdown.ItemsFrame.ScrollingDirection = "Y";
 					dropdown.ItemsFrame.Visible = false;
-					dropdown.ItemsFrame.CanvasSize = UDim2.fromOffset(dropdown.Main.AbsoluteSize.X, 0);
+					dropdown.ItemsFrame.CanvasSize = UDim2.fromOffset(0, 0);
 					dropdown.ListLayout = Instance.new("UIListLayout", dropdown.ItemsFrame);
 					dropdown.ListLayout.FillDirection = Enum.FillDirection.Vertical;
 					dropdown.ListLayout.SortOrder = Enum.SortOrder.LayoutOrder;
@@ -2842,7 +2842,7 @@ library.CreateWindow = function(self, name, hidebutton)
 				dropdown.ItemsFrame.ZIndex = 8;
 				dropdown.ItemsFrame.ScrollingDirection = "Y";
 				dropdown.ItemsFrame.Visible = false;
-				dropdown.ItemsFrame.CanvasSize = UDim2.fromOffset(dropdown.Main.AbsoluteSize.X, 0);
+				dropdown.ItemsFrame.CanvasSize = UDim2.fromOffset(0, 0);
 				dropdown.ListLayout = Instance.new("UIListLayout", dropdown.ItemsFrame);
 				dropdown.ListLayout.FillDirection = Enum.FillDirection.Vertical;
 				dropdown.ListLayout.SortOrder = Enum.SortOrder.LayoutOrder;
@@ -2940,7 +2940,7 @@ library.CreateWindow = function(self, name, hidebutton)
 					Item.BorderSizePixel = 0;
 					Item.Position = UDim2.fromOffset(0, 0);
 					Item.Size = UDim2.fromOffset(dropdown.Main.Size.X.Offset - 4, 20);
-					Item.ZIndex = 9;
+					Item.ZIndex = 56;
 					Item.Text = v;
 					Item.Name = v;
 					Item.AutoButtonColor = false;
@@ -2948,8 +2948,9 @@ library.CreateWindow = function(self, name, hidebutton)
 					Item.TextSize = 15;
 					Item.TextXAlignment = Enum.TextXAlignment.Left;
 					Item.TextStrokeTransparency = 1;
-					dropdown.ItemsFrame.CanvasSize = dropdown.ItemsFrame.CanvasSize + UDim2.fromOffset(0, Item.AbsoluteSize.Y);
-					Item.MouseButton1Down:Connect(function()
+					Item.Active = true;
+
+					local function onSelect()
 						if dropdown.multichoice then
 							if dropdown:isSelected(v) then
 								for i2, v2 in pairs(dropdown.values) do
@@ -2972,10 +2973,22 @@ library.CreateWindow = function(self, name, hidebutton)
 							dropdown.BlackOutline2Items.Visible = false;
 							dropdown.IgnoreBackButtons.Visible = false;
 							dropdown.IgnoreBackButtons.Active = false;
+							dropdown.MainBack.ZIndex = 7;
+							dropdown.Main.ZIndex = 5;
+							sector.Main.Parent.ScrollingEnabled = true;
 						end
 						dropdown:Set(v);
 						return;
+					end
+
+					Item.MouseButton1Down:Connect(onSelect);
+					Item.MouseButton1Click:Connect(onSelect);
+					pcall(function()
+						if Item.Activated then
+							Item.Activated:Connect(onSelect);
+						end
 					end);
+
 					runservice.RenderStepped:Connect(function()
 						if ((dropdown.multichoice and dropdown:isSelected(v)) or (dropdown.values[1] == v)) then
 							Item.BackgroundColor3 = Color3.fromRGB(64, 64, 64);
@@ -2988,8 +3001,9 @@ library.CreateWindow = function(self, name, hidebutton)
 						end
 					end);
 					table.insert(dropdown.items, v);
-					dropdown.ItemsFrame.Size = UDim2.fromOffset(dropdown.Main.Size.X.Offset, math.clamp(#dropdown.items * Item.AbsoluteSize.Y, 20, 156) + 4);
-					dropdown.ItemsFrame.CanvasSize = UDim2.fromOffset(dropdown.ItemsFrame.AbsoluteSize.X, (#dropdown.items * Item.AbsoluteSize.Y) + 4);
+					local totalH = (#dropdown.items * 20) + 4;
+					dropdown.ItemsFrame.Size = UDim2.fromOffset(dropdown.Main.Size.X.Offset, math.clamp(totalH, 20, 156));
+					dropdown.ItemsFrame.CanvasSize = UDim2.fromOffset(0, totalH);
 					dropdown.OutlineItems.Size = dropdown.ItemsFrame.Size + UDim2.fromOffset(4, 4);
 					dropdown.BlackOutlineItems.Size = dropdown.ItemsFrame.Size + UDim2.fromOffset(2, 2);
 					dropdown.BlackOutline2Items.Size = dropdown.ItemsFrame.Size + UDim2.fromOffset(6, 6);
@@ -3003,10 +3017,11 @@ library.CreateWindow = function(self, name, hidebutton)
 								table.remove(dropdown.items, i);
 							end
 						end
-						dropdown.ItemsFrame.Size = UDim2.fromOffset(dropdown.Main.Size.X.Offset, math.clamp(#dropdown.items * item.AbsoluteSize.Y, 20, 156) + 4);
-						dropdown.ItemsFrame.CanvasSize = UDim2.fromOffset(dropdown.ItemsFrame.AbsoluteSize.X, (#dropdown.items * item.AbsoluteSize.Y) + 4);
-						dropdown.OutlineItems.Size = dropdown.ItemsFrame.Size + UDim2.fromOffset(2, 2);
-						dropdown.BlackOutlineItems.Size = dropdown.ItemsFrame.Size + UDim2.fromOffset(4, 4);
+						local totalH = (#dropdown.items * 20) + 4;
+						dropdown.ItemsFrame.Size = UDim2.fromOffset(dropdown.Main.Size.X.Offset, math.clamp(totalH, 20, 156));
+						dropdown.ItemsFrame.CanvasSize = UDim2.fromOffset(0, totalH);
+						dropdown.OutlineItems.Size = dropdown.ItemsFrame.Size + UDim2.fromOffset(4, 4);
+						dropdown.BlackOutlineItems.Size = dropdown.ItemsFrame.Size + UDim2.fromOffset(2, 2);
 						dropdown.BlackOutline2Items.Size = dropdown.ItemsFrame.Size + UDim2.fromOffset(6, 6);
 						dropdown.IgnoreBackButtons.Size = dropdown.ItemsFrame.Size;
 						item:Remove();
@@ -3023,14 +3038,30 @@ library.CreateWindow = function(self, name, hidebutton)
 					end
 					dropdown.items = {}
 					dropdown.ItemsFrame.Size = UDim2.fromOffset(dropdown.Main.Size.X.Offset, 20)
-					dropdown.ItemsFrame.CanvasSize = UDim2.fromOffset(dropdown.ItemsFrame.AbsoluteSize.X, 0)
+					dropdown.ItemsFrame.CanvasSize = UDim2.fromOffset(0, 0)
+					dropdown.OutlineItems.Size = dropdown.ItemsFrame.Size + UDim2.fromOffset(4, 4);
+					dropdown.BlackOutlineItems.Size = dropdown.ItemsFrame.Size + UDim2.fromOffset(2, 2);
+					dropdown.BlackOutline2Items.Size = dropdown.ItemsFrame.Size + UDim2.fromOffset(6, 6);
+					dropdown.IgnoreBackButtons.Size = dropdown.ItemsFrame.Size;
 				end;
 				dropdown.Refresh = function(self, newItems)
+					local currentVal = (dropdown.values and dropdown.values[1]) or dropdown.default
 					dropdown:Clear()
 					for _, v in ipairs(newItems or {}) do
 						dropdown:Add(v)
 					end
-					if newItems and newItems[1] then
+					local found = false
+					if currentVal and newItems then
+						for _, itm in ipairs(newItems) do
+							if itm == currentVal then
+								found = true
+								break
+							end
+						end
+					end
+					if found then
+						dropdown:Set(currentVal)
+					elseif newItems and newItems[1] then
 						dropdown:Set(newItems[1])
 					end
 				end;
@@ -3044,15 +3075,27 @@ library.CreateWindow = function(self, name, hidebutton)
 					if (dropdown.Nav.Rotation == 90) then
 						tweenservice:Create(dropdown.Nav, TweenInfo.new(0.1, Enum.EasingStyle.Linear, Enum.EasingDirection.In), {Rotation=-90}):Play();
 						if (dropdown.items and (#dropdown.items ~= 0)) then
+							dropdown.MainBack.ZIndex = 50;
+							dropdown.Main.ZIndex = 51;
+							dropdown.ItemsFrame.ZIndex = 55;
+							dropdown.OutlineItems.ZIndex = 53;
+							dropdown.BlackOutlineItems.ZIndex = 53;
+							dropdown.BlackOutline2Items.ZIndex = 52;
+							dropdown.IgnoreBackButtons.ZIndex = 51;
 							dropdown.ItemsFrame.ScrollingEnabled = true;
 							sector.Main.Parent.ScrollingEnabled = false;
 							dropdown.ItemsFrame.Visible = true;
 							dropdown.ItemsFrame.Active = true;
-							dropdown.IgnoreBackButtons.Visible = true;
-							dropdown.IgnoreBackButtons.Active = true;
+							dropdown.IgnoreBackButtons.Visible = false;
+							dropdown.IgnoreBackButtons.Active = false;
 							dropdown.OutlineItems.Visible = true;
 							dropdown.BlackOutlineItems.Visible = true;
 							dropdown.BlackOutline2Items.Visible = true;
+							for _, child in pairs(dropdown.ItemsFrame:GetChildren()) do
+								if child:IsA("TextButton") then
+									child.ZIndex = 56;
+								end
+							end
 						end
 					else
 						tweenservice:Create(dropdown.Nav, TweenInfo.new(0.1, Enum.EasingStyle.Linear, Enum.EasingDirection.In), {Rotation=90}):Play();
@@ -3065,6 +3108,18 @@ library.CreateWindow = function(self, name, hidebutton)
 						dropdown.OutlineItems.Visible = false;
 						dropdown.BlackOutlineItems.Visible = false;
 						dropdown.BlackOutline2Items.Visible = false;
+						dropdown.MainBack.ZIndex = 7;
+						dropdown.Main.ZIndex = 5;
+						dropdown.ItemsFrame.ZIndex = 8;
+						dropdown.OutlineItems.ZIndex = 7;
+						dropdown.BlackOutlineItems.ZIndex = 7;
+						dropdown.BlackOutline2Items.ZIndex = 7;
+						dropdown.IgnoreBackButtons.ZIndex = 7;
+						for _, child in pairs(dropdown.ItemsFrame:GetChildren()) do
+							if child:IsA("TextButton") then
+								child.ZIndex = 9;
+							end
+						end
 					end
 				end;
 				dropdown.Main.MouseButton1Down:Connect(MouseButton1Down);
@@ -4213,28 +4268,6 @@ end
         _G.AutoSpinHalloween4 = t
     end)
 
-    local Tab11 = Window:CreateTab("Truyền Tin")
-    local Sector1 = Tab11:CreateSector("Chiến Báo Bí Cảnh (Discord Webhook)", "left")
-    Sector1:AddTextbox("URL Webhook Discord" , "" , function(w)
-        _G.UrlWebhook = w
-    end)
-    Sector1:AddToggle("Gửi Chiến Báo Rơi Đồ (Drops Result)", false, function(t)
-		_G.SendDropsResult = t
-	end)
-    Sector1:AddToggle("Gửi Tin Đột Phá Cảnh Giới (Level Up)", false, function(t)
-		_G.SendIfLevelUp = t
-	end)
-    Sector1:AddButton("Bắn Thử Webhook (Test)", function()
-        pcall(function()
-            if not _G.UrlWebhook or #_G.UrlWebhook < 10 then
-                if Notification then Notification(1, "SuiSui Tiên Các", "Vui lòng nhập URL Webhook trước!", 3) end
-                return
-            end
-            SendTestWebhook()
-            if Notification then Notification(1, "SuiSui Tiên Các", "Đã gửi thử chiến báo thành công!", 3) end
-        end)
-    end)
-
     local function PlayerDetect()
         local Players = game.Players:GetPlayers()
         return tonumber(#Players)
@@ -5261,549 +5294,6 @@ end
 
                             task.wait(4.0) -- Cho game nhan remote va chuyen man hinh
                             isReplaying = false
-                        end
-                    end
-                end)
-            end
-        end)
-    end)
-    local function sendDiscordWebhook(data)
-        pcall(function()
-            if not _G.UrlWebhook or #_G.UrlWebhook < 10 then return end
-            local requestFn = (syn and syn.request) or (http and http.request) or http_request or request or HttpPost
-            if not requestFn then
-                print("[SuiSui Tien Cac] Khong tim thay ham request HTTP!")
-                return
-            end
-            requestFn({
-                Url = _G.UrlWebhook,
-                Method = "POST",
-                Headers = {["Content-Type"] = "application/json"},
-                Body = game:GetService("HttpService"):JSONEncode({
-                    username = "UTD",
-                    embeds = {data}
-                })
-            })
-            print("[SuiSui Tien Cac] Da truyen tin chien bao thanh cong!")
-        end)
-    end
-
-    local function GetPlayerCardCount()
-        local cardCount = "13/500"
-        pcall(function()
-            local plr = game.Players.LocalPlayer
-            local pgui = plr:FindFirstChild("PlayerGui")
-            -- 1. Scan PlayerGui descendants for any "[count]/[max]" pattern
-            if pgui then
-                for _, d in ipairs(pgui:GetDescendants()) do
-                    if d:IsA("TextLabel") and d.Text:match("%d+%s*/%s*%d+") then
-                        local cur, max = d.Text:match("(%d+)%s*/%s*(%d+)")
-                        if cur and max then
-                            if max == "500" or d.Name:lower():find("card") or (d.Parent and d.Parent.Name:lower():find("card")) then
-                                cardCount = cur .. "/" .. max
-                                return
-                            end
-                        end
-                    end
-                end
-            end
-            -- 2. Scan ReplicatedStorage StatDisplay
-            local stat = game:GetService("ReplicatedStorage"):FindFirstChild(plr.Name .. "StatDisplay")
-            if stat then
-                local cardsFolder = stat:FindFirstChild("Cards") or stat:FindFirstChild("CardInventory")
-                if cardsFolder and (cardsFolder:IsA("Folder") or cardsFolder:IsA("Configuration") or cardsFolder:IsA("Model")) then
-                    cardCount = tostring(#cardsFolder:GetChildren()) .. "/500"
-                    return
-                end
-                for _, c in ipairs(stat:GetChildren()) do
-                    local low = c.Name:lower()
-                    if low:find("card") then
-                        if c:IsA("ValueBase") and tonumber(c.Value) then
-                            cardCount = tostring(c.Value) .. "/500"
-                            return
-                        elseif c:IsA("Folder") or c:IsA("Configuration") or c:IsA("Model") then
-                            cardCount = tostring(#c:GetChildren()) .. "/500"
-                            return
-                        end
-                    end
-                end
-            end
-            -- 3. Check CardInventoryScrollingFrame if in Lobby
-            if pgui then
-                local scroll = pgui:FindFirstChild("CardInventoryScrollingFrame", true)
-                if scroll then
-                    local count = 0
-                    for _, ch in ipairs(scroll:GetChildren()) do
-                        if ch:IsA("ImageButton") and ch.Name ~= "CardInventorySlot" and ch.Name ~= "Template" then
-                            count = count + 1
-                        end
-                    end
-                    if count > 0 then
-                        cardCount = tostring(count) .. "/500"
-                        return
-                    end
-                end
-            end
-        end)
-        return cardCount
-    end
-
-    local function GetPlayerDamageDealt(cFrame)
-        local damageDealt = "0"
-        pcall(function()
-            local plr = game.Players.LocalPlayer
-            -- 1. Try reading StatDisplay.Damage first
-            local stat = game:GetService("ReplicatedStorage"):FindFirstChild(plr.Name .. "StatDisplay")
-            if stat and stat:FindFirstChild("Damage") then
-                local dVal = tonumber(stat.Damage.Value)
-                if dVal and dVal > 0 then
-                    damageDealt = tostring(math.floor(dVal))
-                    return
-                end
-            end
-            -- 2. Check cFrame for labels with digits
-            if cFrame then
-                local ddLabel = cFrame:FindFirstChild("DamageDealt", true)
-                if ddLabel then
-                    for _, ch in ipairs(ddLabel:GetChildren()) do
-                        if ch:IsA("TextLabel") and #ch.Text > 0 then
-                            local digits = ch.Text:gsub("[^%d]", "")
-                            if #digits > 0 and digits ~= "0" then
-                                damageDealt = digits
-                                return
-                            end
-                        end
-                    end
-                end
-                for _, n in ipairs({"TotalDamageNum", "DamageNum", "DamageAmount", "TotalDamageText", "DamageText"}) do
-                    local f = cFrame:FindFirstChild(n, true)
-                    if f and f:IsA("TextLabel") and #f.Text > 0 then
-                        local digits = f.Text:gsub("[^%d]", "")
-                        if #digits > 0 and digits ~= "0" then
-                            damageDealt = digits
-                            return
-                        end
-                    end
-                end
-                for _, d in ipairs(cFrame:GetDescendants()) do
-                    if d:IsA("TextLabel") and d.Name:lower():find("damage") and d.Name ~= "DamageDealt" then
-                        local digits = d.Text:gsub("[^%d]", "")
-                        if #digits > 0 and digits ~= "0" then
-                            damageDealt = digits
-                            return
-                        end
-                    end
-                end
-            end
-        end)
-        return damageDealt
-    end
-
-    local function GetPlayerExpText()
-        local expText = "100%"
-        pcall(function()
-            local plr = game.Players.LocalPlayer
-            local pgui = plr:FindFirstChild("PlayerGui")
-            if pgui then
-                -- Check for "X%" or "X/100%"
-                for _, d in ipairs(pgui:GetDescendants()) do
-                    if d:IsA("TextLabel") and (d.Text:match("%d+%%") or d.Text:match("%d+/%d+%%")) then
-                        if d.Name:lower():find("exp") or d.Parent.Name:lower():find("exp") then
-                            expText = d.Text:gsub("^EXP%s*", ""):gsub("^Exp:%s*", "")
-                            return
-                        end
-                    end
-                end
-                -- TopUIFrame
-                local topF = pgui:FindFirstChild("TopUIFrame", true)
-                if topF then
-                    local expL = topF:FindFirstChild("Exp", true) or topF:FindFirstChild("ExpLabel", true)
-                    if expL and expL:IsA("TextLabel") then
-                        expText = expL.Text
-                        return
-                    end
-                end
-            end
-        end)
-        return expText
-    end
-
-    local function GetPlayerCurrencies()
-        local raw = {
-            BossRushTickets = nil,
-            SpeedRaidTokens = nil,
-            SpecialGem = nil,
-            TraitTokens = nil,
-            RaidTokens = nil,
-            Gems = nil,
-            Gold = nil
-        }
-
-        local function assignVal(category, val)
-            if raw[category] == nil and val ~= nil then
-                if type(val) == "number" then
-                    raw[category] = val
-                elseif type(val) == "string" then
-                    local cleaned = val:gsub(",", ""):gsub("%s+", "")
-                    if cleaned:find("[kKmMbB]") then
-                        raw[category] = cleaned
-                    else
-                        local n = tonumber(cleaned)
-                        if n then raw[category] = n else raw[category] = val end
-                    end
-                end
-            end
-        end
-
-        local function checkItem(name, val)
-            if not name or val == nil then return end
-            local low = name:lower():gsub("[%s_]+", "")
-            if low:find("darkgem") or low:find("specialgem") or low:find("shadowtoken") then
-                assignVal("SpecialGem", val)
-            elseif low:find("speedraid") then
-                assignVal("SpeedRaidTokens", val)
-            elseif low:find("bossrush") then
-                assignVal("BossRushTickets", val)
-            elseif low:find("traittoken") or low:find("trait") then
-                assignVal("TraitTokens", val)
-            elseif low:find("raidtoken") or low == "raid" or low:find("tokenraid") then
-                assignVal("RaidTokens", val)
-            elseif low:find("gold") or low:find("coin") then
-                assignVal("Gold", val)
-            elseif low == "gems" or low == "gem" then
-                assignVal("Gems", val)
-            end
-        end
-
-        local plr = game.Players.LocalPlayer
-        local stat = game:GetService("ReplicatedStorage"):FindFirstChild(plr.Name .. "StatDisplay")
-
-        -- 1. Scan StatDisplay
-        if stat then
-            for _, c in ipairs(stat:GetChildren()) do
-                if c:IsA("ValueBase") then
-                    checkItem(c.Name, c.Value)
-                end
-            end
-        end
-
-        -- 2. Scan leaderstats
-        local ls = plr:FindFirstChild("leaderstats")
-        if ls then
-            for _, c in ipairs(ls:GetChildren()) do
-                if c:IsA("ValueBase") then
-                    checkItem(c.Name, c.Value)
-                end
-            end
-        end
-
-        -- 3. Scan LocalPlayer attributes
-        for k, v in pairs(plr:GetAttributes()) do
-            checkItem(k, v)
-        end
-        if stat then
-            for k, v in pairs(stat:GetAttributes()) do
-                checkItem(k, v)
-            end
-        end
-
-        -- 4. Scan PlayerGui for currency labels
-        local pgui = plr:FindFirstChild("PlayerGui")
-        if pgui then
-            for _, d in ipairs(pgui:GetDescendants()) do
-                if d:IsA("TextLabel") and d.Text:match("%d") then
-                    checkItem(d.Name, d.Text)
-                end
-            end
-        end
-
-        local function fmt(v)
-            if v == nil then return "0" end
-            if type(v) == "string" then
-                if v:find("[kKmMbB]") then return v end
-                local n = tonumber(v:gsub(",", ""))
-                if n then v = n else return v end
-            end
-            if type(v) == "number" then
-                if v >= 1e9 then
-                    return string.format("%.2fB", v / 1e9)
-                elseif v >= 1e6 then
-                    return string.format("%.2fM", v / 1e6)
-                elseif v >= 1e3 then
-                    local formatted = tostring(math.floor(v))
-                    local k
-                    while true do
-                        formatted, k = string.gsub(formatted, "^(-?%d+)(%d%d%d)", '%1,%2')
-                        if k == 0 then break end
-                    end
-                    return formatted
-                else
-                    return tostring(math.floor(v))
-                end
-            end
-            return tostring(v)
-        end
-
-        local lines = {}
-        table.insert(lines, string.format("👑 %s", fmt(raw.BossRushTickets)))
-        table.insert(lines, string.format("🌸 %s", fmt(raw.SpeedRaidTokens)))
-        table.insert(lines, string.format("🌙 %s", fmt(raw.SpecialGem)))
-        table.insert(lines, string.format("🔮 %s", fmt(raw.TraitTokens)))
-        table.insert(lines, string.format("🐉 %s", fmt(raw.RaidTokens)))
-        table.insert(lines, string.format("💎 %s", fmt(raw.Gems)))
-        table.insert(lines, string.format("🟡 %s", fmt(raw.Gold)))
-
-        return table.concat(lines, "\n")
-    end
-
-    function SendTestWebhook()
-        local level = "163"
-        pcall(function()
-            if game.Players.LocalPlayer.leaderstats:FindFirstChild("Level") then
-                level = tostring(game.Players.LocalPlayer.leaderstats.Level.Value)
-            end
-        end)
-        local cardCount = GetPlayerCardCount()
-        local damageDealt = GetPlayerDamageDealt()
-        if damageDealt == "0" then damageDealt = "22631537" end
-        local currencies = GetPlayerCurrencies()
-        local expText = GetPlayerExpText()
-        if expText == "100%" then expText = "60/100%" end
-
-        local data = {
-            ["title"] = "Anime Dimension Simulator",
-            ["type"] = "rich",
-            ["url"] = "https://discord.gg/PzNdysy4W3",
-            ["color"] = 15158332, -- Do tuoi (0xE74C3C)
-            ["author"] = {
-                ["name"] = "SmellLikeHacker",
-                ["url"] = "https://discord.gg/PzNdysy4W3"
-            },
-            ["description"] = string.format([[**User** : ||%s||
-**Level** %s : %s
-**Card** : %s
-
-**Match Result**
-**GameMap** : Halloween Dimension
-**GameStatus** : [Victory!]
-**Damage Dealt**: %s
-**Time**: 04:43
-
-**Item Reward**
-[+] Death Knight [Common]
-[+] Candy [Common]
-
-**Other Reward**
-[+] Candy: x216
-
-**Currency**
-%s]], game.Players.LocalPlayer.Name, level, expText, cardCount, damageDealt, currencies),
-            ["footer"] = {
-                ["text"] = "https://discord.gg/PzNdysy4W3 : " .. getGMT7Time("%H:%M")
-            },
-            ["timestamp"] = DateTime.now():ToIsoDate()
-        }
-        sendDiscordWebhook(data)
-    end
-
-    spawn(function()
-        pcall(function()
-            local lastLevel = 0
-            while task.wait(1) do
-                pcall(function()
-                    if _G.SendIfLevelUp == true and _G.UrlWebhook and #_G.UrlWebhook > 10 then
-                        local currLevel = game.Players.LocalPlayer.leaderstats:FindFirstChild("Level") and game.Players.LocalPlayer.leaderstats.Level.Value or 0
-                        local levelUpImg = game:GetService("Players").LocalPlayer.PlayerGui.UniversalGui.UniversalCenterUIFrame:FindFirstChild("LevelUpImage")
-                        local isLevelUp = (levelUpImg and levelUpImg.Visible == true) or (lastLevel > 0 and currLevel > lastLevel)
-                        
-                        if isLevelUp then
-                            lastLevel = currLevel
-                            local data = {
-                                ["title"] = "Anime Dimension Simulator",
-                                ["type"] = "rich",
-                                ["url"] = "https://discord.gg/PzNdysy4W3",
-                                ["color"] = 15158332,
-                                ["author"] = {
-                                    ["name"] = "SmellLikeHacker",
-                                    ["url"] = "https://discord.gg/PzNdysy4W3"
-                                },
-                                ["description"] = string.format([[**User** : ||%s||
-**Level** : %s (Level Up!)
-**Card** : %s
-**Time** : %s
-
-**Currency**
-%s]], game.Players.LocalPlayer.Name, tostring(currLevel), cardCount, getGMT7Time("%H:%M"), currencies),
-                                ["footer"] = {
-                                    ["text"] = "https://discord.gg/PzNdysy4W3 : " .. getGMT7Time("%H:%M")
-                                },
-                                ["timestamp"] = DateTime.now():ToIsoDate()
-                            }
-                            sendDiscordWebhook(data)
-                            task.wait(15)
-                        else
-                            if currLevel > 0 then lastLevel = currLevel end
-                        end
-                    end
-                end)
-            end
-        end)
-    end)
-
-    spawn(function()
-        pcall(function()
-            local lastDropsSentTick = 0
-            while task.wait(1) do
-                pcall(function()
-                    if _G.SendDropsResult == true and _G.UrlWebhook and #_G.UrlWebhook > 10 then
-                        local pgui = game.Players.LocalPlayer:FindFirstChild("PlayerGui")
-                        if not pgui then return end
-                        local uGui = pgui:FindFirstChild("UniversalGui")
-                        local cFrame = uGui and uGui:FindFirstChild("UniversalCenterUIFrame")
-                        local resUI = cFrame and cFrame:FindFirstChild("ResultUI")
-                        local raidResUI = cFrame and cFrame:FindFirstChild("RaidResultUI")
-
-                        local isFinished = (resUI and resUI.Visible == true) or (raidResUI and raidResUI.Visible == true)
-                        if isFinished and (tick() - lastDropsSentTick) > 30 then
-                            lastDropsSentTick = tick()
-                            task.wait(2.5) -- Đợi các ô phần thưởng render xong
-
-                            -- 1. Thông tin Đạo Hữu
-                            local playerName = game.Players.LocalPlayer.Name
-                            local level = "???"
-                            pcall(function()
-                                level = tostring(game.Players.LocalPlayer.leaderstats.Level.Value)
-                            end)
-
-                            local expText = GetPlayerExpText()
-                            local cardCount = GetPlayerCardCount()
-
-                            -- 2. Thông tin Bí Cảnh
-                            local mapName = "Bí Cảnh Tu Tiên"
-                            pcall(function()
-                                local gMap = workspace:FindFirstChild("GameMap")
-                                if gMap and #gMap:GetChildren() > 0 then
-                                    mapName = gMap:GetChildren()[1].Name
-                                end
-                            end)
-                            if mapName == "Bí Cảnh Tu Tiên" and _G.MapSelection then
-                                mapName = tostring(_G.MapSelection)
-                            end
-
-                            local gameStatus = "[Đắc Đạo Đại Thắng! (Victory)]"
-                            local damageDealt = GetPlayerDamageDealt(cFrame)
-
-                            local matchTime = "00:00"
-                            pcall(function()
-                                local tLabel = (resUI and resUI:FindFirstChild("ClearTimeText", true)) or (resUI and resUI:FindFirstChild("TimeText", true))
-                                if tLabel and tLabel:IsA("TextLabel") and #tLabel.Text > 0 then
-                                    matchTime = tLabel.Text:gsub("Clear Time:%s*", ""):gsub("Time:%s*", "")
-                                else
-                                    local st = workspace.DistributedGameTime
-                                    matchTime = string.format("%02d:%02d", math.floor(st / 60 % 60), math.floor(st % 60))
-                                end
-                            end)
-
-                            -- 3. Quét Pháp Bảo & Linh Đan
-                            local itemRewards = {}
-                            local otherRewards = {}
-                            local rawCounts = {}
-
-                            local rewardGrid = (resUI and resUI:FindFirstChild("RewardGridFrame", true))
-                            if not rewardGrid and raidResUI then
-                                rewardGrid = raidResUI:FindFirstChild("RaidRewardGridFrame", true)
-                            end
-
-                            if rewardGrid then
-                                for _, v in ipairs(rewardGrid:GetChildren()) do
-                                    if v:IsA("GuiObject") and not v:IsA("UIGridLayout") and not v:IsA("UIListLayout") then
-                                        local levelReq = v:FindFirstChild("LevelReq")
-                                        if levelReq and tonumber(levelReq.Text) then
-                                            local qty = tonumber(levelReq.Text) or 1
-                                            rawCounts[v.Name] = (rawCounts[v.Name] or 0) + qty
-                                        else
-                                            local rarity = "[Common]"
-                                            local grad = v:FindFirstChild("Gradient")
-                                            if grad then
-                                                local col = tostring(grad.Color)
-                                                if col:find("0.352941") then
-                                                    rarity = "[Uncommon]"
-                                                elseif col:find("0.666667") and col:find("0.780392") then
-                                                    rarity = "[Rare]"
-                                                elseif col:find("0.494118") then
-                                                    rarity = "[Epic]"
-                                                elseif col:find("0.639216") then
-                                                    rarity = "[Legendary]"
-                                                elseif col:find("Mythic") or col:find("1") then
-                                                    rarity = "[Mythic]"
-                                                end
-                                            end
-                                            table.insert(itemRewards, string.format("[+] %s %s", v.Name, rarity))
-                                        end
-                                    end
-                                end
-                            end
-
-                            for name, count in pairs(rawCounts) do
-                                table.insert(otherRewards, string.format("[+] %s: x%s", name, tostring(count)))
-                            end
-
-                            if #itemRewards == 0 then
-                                table.insert(itemRewards, "(Trận này không có pháp bảo rơi)")
-                            end
-                            if #otherRewards == 0 then
-                                table.insert(otherRewards, "(Trận này không có linh đan rơi)")
-                            end
-
-                            -- 4. Thu thập Tiền tệ (BossRush, SpeedRaid, SpecialGem, Trait, TokenRaid, Gem, Coin)
-                            local currencies = GetPlayerCurrencies()
-
-                            -- 5. Lap Embed chuan format tham chieu
-                            local embed = {
-                                ["title"] = "Anime Dimension Simulator",
-                                ["type"] = "rich",
-                                ["url"] = "https://discord.gg/PzNdysy4W3",
-                                ["color"] = 15158332, -- Do tuoi (0xE74C3C)
-                                ["author"] = {
-                                    ["name"] = "SmellLikeHacker",
-                                    ["url"] = "https://discord.gg/PzNdysy4W3"
-                                },
-                                ["description"] = string.format([[**User** : ||%s||
-**Level** %s : %s
-**Card** : %s
-
-**Match Result**
-**GameMap** : %s
-**GameStatus** : [Victory!]
-**Damage Dealt**: %s
-**Time**: %s
-
-**Item Reward**
-%s
-
-**Other Reward**
-%s
-
-**Currency**
-%s]],
-                                    playerName,
-                                    level,
-                                    expText,
-                                    cardCount,
-                                    mapName,
-                                    damageDealt,
-                                    matchTime,
-                                    table.concat(itemRewards, "\n"),
-                                    table.concat(otherRewards, "\n"),
-                                    currencies
-                                ),
-                                ["footer"] = {
-                                    ["text"] = "https://discord.gg/PzNdysy4W3 : " .. getGMT7Time("%H:%M")
-                                },
-                                ["timestamp"] = DateTime.now():ToIsoDate()
-                            }
-
-                            sendDiscordWebhook(embed)
                         end
                     end
                 end)

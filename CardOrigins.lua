@@ -1308,6 +1308,98 @@ local function teleportToWorld(mapId)
     end
 end
 
+-- ========================================================================
+-- QUY TRÌNH CHUẨN XÁC ĐẤM TRÙM CUỐI (MAIN BOSS) THEO YÊU CẦU DJ:
+-- 1. Teleport tới Map của Boss
+-- 2. Đợi 3.0s để toàn bộ Map nạp hoàn tất
+-- 3. Teleport tới nơi Boss đứng (Đứng an toàn trên mặt sàn)
+-- 4. Tự động bấm E vào ProximityPrompt
+-- 5. Chờ giao diện FIGHT xuất hiện
+-- 6. Đợi thêm 0.5s (chống lỗi do bấm quá nhanh)
+-- 7. Chọn độ khó & Bấm FIGHT
+-- 8. Gửi chuỗi Remote chiến thắng & Nhận thưởng trọn gói
+-- ========================================================================
+local function engageMainBossBattle(bossId, diff)
+    if not bossId then return false end
+    diff = resolveDifficulty(diff)
+    
+    local targetMapId = getMainBossMapId(bossId)
+    local curMapId = detectCurrentMapId()
+    
+    -- 1. Teleport tới Map của Boss nếu chưa ở trong map đó & Đợi 3.0s cho map load hoàn tất
+    if curMapId ~= targetMapId then
+        safeLog(string.format("[SuiSuiHUB] Đang tele tới Map: %s (Trùm: %s)...", tostring(targetMapId), tostring(bossId)))
+        Notification("Trùm Cuối", string.format("Đang vào map %s (Chờ 3s tải map)...", tostring(targetMapId)), 3)
+        teleportToWorld(targetMapId)
+        task.wait(3.0)
+    else
+        task.wait(0.3)
+    end
+    
+    -- 2. Quét tìm vị trí Boss đứng trong Map (tối đa 8 lần thử)
+    local prompt, cf = nil, nil
+    for attempt = 1, 8 do
+        prompt, cf = findBossPromptAndCFrame(bossId)
+        if prompt and cf then break end
+        task.wait(0.3)
+    end
+    
+    local char = localPlayer.Character
+    local hrp = char and char:FindFirstChild("HumanoidRootPart")
+    local hum = char and char:FindFirstChildOfClass("Humanoid")
+    if not hrp or not hum or hum.Health <= 0 then
+        safeWarn("[SuiSuiHUB] Nhân vật chưa sẵn sàng để tiếp cận Boss!")
+        return false
+    end
+    
+    -- 3. Teleport tới nơi Boss chính đứng (Đứng ngay đỉnh bục an toàn, không bị lùi rơi vực)
+    if cf then
+        local safePos = cf.Position + Vector3.new(0, 2.5, 0)
+        hrp.Velocity = Vector3.zero
+        hrp.CFrame = CFrame.new(safePos, cf.Position + (cf.LookVector * 5))
+        task.wait(0.3)
+    end
+    
+    -- 4. Tự động bấm E kích hoạt mở Menu Boss
+    if prompt then
+        pcall(function()
+            if fireproximityprompt then
+                fireproximityprompt(prompt)
+            else
+                prompt:InputHoldBegin()
+                task.wait(prompt.HoldDuration + 0.05)
+                prompt:InputHoldEnd()
+            end
+        end)
+    end
+    
+    -- 5. Chờ giao diện FIGHT (BossGui / WorldBossGui / GojoBossGui) xuất hiện
+    local bossGui = nil
+    for t = 1, 25 do
+        bossGui = getActiveBossScreenGui()
+        if bossGui then break end
+        task.wait(0.1)
+    end
+    
+    -- 6. Đợi thêm 0.5s trước khi bấm (chống lỗi do bấm quá nhanh theo đúng yêu cầu dj)
+    task.wait(0.5)
+    
+    -- 7. Chọn độ khó đã cài đặt
+    selectGameBossDifficulty(diff)
+    task.wait(0.15)
+    
+    -- 8. Bấm nút FIGHT trên giao diện
+    local fightBtn = findFightButton()
+    if fightBtn then
+        clickGuiElement(fightBtn)
+        task.wait(0.3)
+    end
+    
+    -- 9. Gửi chuỗi Remote báo cáo bắt đầu & nhận quà trọn gói
+    local reportOk = executeBossVictory(bossId, diff)
+    return reportOk
+end
+
 -- Tiện ích: Quay Spin
 local function spinWheel(amount)
     amount = tonumber(amount) or 11
@@ -1742,19 +1834,11 @@ task.spawn(function()
                         end
                         
                         isMainBossFighting = true
-                        safeLog(string.format("[SuiSuiHUB] Đang tự động đấm Trùm Cuối: %s [%s]...", tostring(bossId), tostring(diff)))
+                        safeLog(string.format("[SuiSuiHUB] Bắt đầu quy trình đấm Trùm Cuối: %s [%s]...", tostring(bossId), tostring(diff)))
                         
-                        -- Kích hoạt ProximityPrompt từ xa nếu Boss có trong map (TUYỆT ĐỐI KHÔNG di chuyển nhân vật để chống rơi xuống void / chết)
-                        pcall(function()
-                            local prompt = findBossPromptAndCFrame(bossId)
-                            if prompt and fireproximityprompt then
-                                fireproximityprompt(prompt)
-                                task.wait(0.1)
-                            end
-                        end)
-                        
-                        -- Đấm boss & nhận quà trọn gói qua chuỗi Remote chuẩn xác (Giống hệt cách Gojo vừa thành công!)
-                        executeBossVictory(bossId, diff)
+                        -- Thực thi trọn gói chuỗi hành động chuẩn xác dj yêu cầu:
+                        -- Tele tới Map -> Chờ 3s load map -> Tele tới Boss an toàn -> Tự bấm E -> Chờ FIGHT GUI -> Đợi thêm 0.5s -> Bấm FIGHT & Nhận thưởng
+                        engageMainBossBattle(bossId, diff)
                         
                         isMainBossFighting = false
                         

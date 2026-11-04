@@ -1530,9 +1530,13 @@ local function executeRiftGateCycle()
     if riftGateLeaveRemote then
         pcall(function() riftGateLeaveRemote:FireServer() end)
     end
+    task.wait(0.3)
     
-    safeLog(string.format("[SuiSuiHUB] Đã đấm RiftGATE xong! Kết quả: %s", tostring(victoryOk)))
-    Notification("RiftGATE", "Đã tự động đấm RiftGATE & nhận quà thành công!", 4)
+    -- 6. Tự động dịch chuyển về Lobby (Sảnh Chính) theo đúng yêu cầu dj
+    teleportToWorld("lobby")
+    
+    safeLog(string.format("[SuiSuiHUB] Đã đấm RiftGATE xong & Teleport về Lobby! Kết quả: %s", tostring(victoryOk)))
+    Notification("RiftGATE", "Đã đấm RiftGATE, nhận quà & Teleport về Lobby thành công!", 4)
     return victoryOk
 end
 
@@ -2139,6 +2143,11 @@ end)
 
 SecRiftRight:AddButton("Teleport Tới Cổng Rift (Bay Tới Cổng)", function()
     teleportToRiftGate()
+end)
+
+SecRiftRight:AddButton("Teleport Về Lobby (Sảnh Chính)", function()
+    teleportToWorld("lobby")
+    Notification("Teleport", "Đang dịch chuyển về Lobby (Sảnh Chính)!", 2)
 end)
 
 SecRiftRight:AddButton("Vào Cổng Thủ Công (RiftGateEnterRequest)", function()

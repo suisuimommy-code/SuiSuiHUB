@@ -61,6 +61,16 @@ local GameDatabase = {
         UniverseIds = {},
         ScriptPath = "anime dimesion/ADS.lua",
         Description = "Auto Farm Map, Auto Raid, Quản Lý Thẻ & Kỹ Năng"
+    },
+
+    -- 3. Anime Eyes
+    ["Anime Eyes"] = {
+        PlaceIds = {
+            97617452700163
+        },
+        UniverseIds = {},
+        ScriptPath = "Anime Eyes/AnimeEyes.lua",
+        Description = "Auto Click Remote Siêu Tốc, Turbo Mode, Chống AFK"
     }
 }
 

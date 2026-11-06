@@ -92,10 +92,17 @@ end
 -- ========================================================================
 local library = nil
 local function loadLibrary()
-    -- 1. Ưu tiên localhost nếu đang mở server test
-    pcall(function()
-        library = loadstring(game:HttpGet("http://127.0.0.1:8000/inventory.lua"))()
-    end)
+    -- 1. Ưu tiên Localhost / LAN (Hỗ trợ cả PC và giả lập MuMu/LDPlayer/BlueStacks)
+    for _, host in ipairs({"http://127.0.0.1:8000", "http://192.168.2.203:8000", "http://10.0.2.2:8000", "http://172.18.144.1:8000"}) do
+        if not library then
+            pcall(function()
+                local code = game:HttpGet(host .. "/inventory.lua?t=" .. tostring(os.time()))
+                if code and #code > 100 then
+                    library = loadstring(code)()
+                end
+            end)
+        end
+    end
     -- 2. Nếu không có localhost, đọc file cục bộ nếu có executor hỗ trợ
     if not library and isfile and readfile and isfile("inventory.lua") then
         pcall(function()
@@ -246,23 +253,18 @@ local currentStageData = {
     combatState = "Đang chờ lệnh..."
 }
 
-local discoveredEggNames = { "Starter Egg", "Leaf Egg", "Sand Egg", "Sound Egg", "Mist Egg", "Cloud Egg", "Waterfall Egg", "Rain Egg", "Star Egg" }
-
--- Forward Declarations
-local startStageLoop, advanceToNextStageGate, teleportToStageOne
-local startNativeClickLoop, triggerRebirthOnce
-local toggleWhiteScreen, applyFPSBoost
-local scanStageAndTrophies, getAliveEnemies, isStageCleared
+-- Forward Declarations (Tối ưu số lượng biến local cấp cao nhất dưới ngưỡng 200 của Luau)
+local startStageLoop, teleportToWorld, teleportToStageOne
+local startNativeClickLoop, triggerRebirthOnce, toggleWhiteScreen, applyFPSBoost
 local unlockNextEyeAction, equipBestEyeAction, rollAuraAction
 local updateEggTabForWorld, getSelectedCupEggData, scanLiveWorldCupEggs
 local LabelCurrentWorldEgg, LabelEggCost, DropdownEgg
 local autoSaveSettings, autoLoadSettings
 local buyBossShopAction, claimAllFreeRewards, redeemAllKnownCodes, openGameMenu
-local findAndClickJoinBoss, isKyubiJoinButton, findKyubiBossModel, getKyubiTimerStatus, dumpKyubiBossNow, dismissRobuxModals
+local findAndClickJoinBoss, isKyubiJoinButton, getKyubiTimerStatus, dumpKyubiBossNow, dismissRobuxModals
 local isInsideKyubiArena, isPlayerNearArenaExitPortal, getKyubiBossTarget, executeBossVictoryExit, restorePlayerMovementControls
-local LabelWorldBossStatus, LabelWorldBossPhase, bossRemote, bossDropRemote, bossShopRemote
-local ToggleAutoStage, ToggleAutoBoss, bossHunterState
-local LabelCurrentEye, LabelNextEye, LabelEyeProgress, LabelCurrentAura, LabelOwnedAurasCount, LabelBossCurrency
+local LabelWorldBossStatus, LabelWorldBossPhase, bossRemote, bossDropRemote, bossShopRemote, bossHunterState
+local LabelCurrentEye, LabelNextEye, LabelEyeProgress, LabelCurrentAura, LabelOwnedAurasCount
 
 -- ========================================================================
 -- 5. KHỞI TẠO NGAY GIAO DIỆN CHÍNH THỨC (INSTANT UI CREATION AT TOP)
@@ -276,9 +278,6 @@ Notification("SuiSuiHUB", "Giao diện đã mở thành công! (Bấm Menu trên
 local TabStage = Window:CreateTab("Chiến Đấu")
 local SecStageLeft = TabStage:CreateSector("1. Vượt Ải Stage & Thời Gian", "left")
 local SecStageRight = TabStage:CreateSector("2. Chọn World, Stage Nhận Cúp & Boss", "right")
-
--- Forward declarations cho World Navigation
-local teleportToWorld, teleportToStageOne
 
 local WORLD_LIST = {
     "World 1: Shinobi Lands",
@@ -513,6 +512,7 @@ end)
 -- ------------------------------------------------------------------------
 -- TAB 2: TỰ ĐỘNG FARM (FARM CHAKRA & TRÙNG SINH TÍCH HỢP)
 -- ------------------------------------------------------------------------
+do
 local TabFarm = Window:CreateTab("Tự Động Farm")
 local SecClick = TabFarm:CreateSector("1. Đòn Đánh Chakra Native", "left")
 local SecRebirth = TabFarm:CreateSector("2. Trùng Sinh (Auto Rebirth)", "left")
@@ -582,6 +582,7 @@ end)
 SecFarmSkills:AddToggle("Tự Nhận Thưởng Quests / Daily / Group", _G.AnimeEyes_AutoClaims, function(v)
     _G.AnimeEyes_AutoClaims = v
 end)
+end
 
 -- ------------------------------------------------------------------------
 -- TAB 3: MỞ TRỨNG (EGGS & PETS - CHỈ HIỆN TRỨNG CÚP THEO TỪNG WORLD)
@@ -647,6 +648,7 @@ scanLiveWorldCupEggs = function(worldNum)
     return wData
 end
 
+do
 local TabEggs = Window:CreateTab("Mở Trứng")
 local SecEggsLeft = TabEggs:CreateSector("1. Tự Động Mở Trứng (Auto Hatch)", "left")
 local SecEggsRight = TabEggs:CreateSector("2. Quản Lý Thú Cưng (Pets)", "right")
@@ -918,6 +920,7 @@ end)
 SecConfig:AddButton("Nạp Lại Cấu Hình Thủ Công (Load)", function()
     if autoLoadSettings then autoLoadSettings(true) end
 end)
+end
 
 -- ========================================================================
 -- 6. KẾT NỐI REMOTES VÀ CLIENT MODULES (SAFE & NON-BLOCKING)
@@ -1379,6 +1382,8 @@ end
 -- ========================================================================
 -- 9.5. HỆ THỐNG SĂN BOSS THẾ GIỚI KYUBI (ƯU TIÊN SỐ 1, AUTO DODGE 3D & CỔNG EXIT)
 -- ========================================================================
+local isGuiActuallyVisible, triggerGuiButton
+do
 _G.AnimeEyes_KyubiActiveOnScreen = false
 bossHunterState = "IDLE"
 local joinAttemptTime = 0
@@ -1400,7 +1405,7 @@ localPlayer.CharacterAdded:Connect(function()
     end
 end)
 
-local function isGuiActuallyVisible(guiObj)
+isGuiActuallyVisible = function(guiObj)
     if not guiObj or not guiObj:IsA("GuiObject") or not guiObj.Visible then return false end
     local cur = guiObj.Parent
     while cur and not cur:IsA("ScreenGui") do
@@ -1854,7 +1859,7 @@ local function clampInsideBossArena(pos, fallbackCenter)
     return pos
 end
 
-local function triggerGuiButton(btn)
+triggerGuiButton = function(btn)
     if not btn then return false end
     local clicked = false
     local targets = { btn }
@@ -2569,6 +2574,8 @@ task.spawn(function()
     end
 end)
 
+end
+
 -- ========================================================================
 -- 10. LOGIC FARM CHAKRA, TRÙNG SINH & MỞ TRỨNG CÚP (TAB 2 & TAB 3 ENGINE)
 -- ========================================================================
@@ -2675,6 +2682,7 @@ end)
 -- ========================================================================
 -- 13. HỆ THỐNG CỬA HÀNG HOÀN CHỈNH (MY EYES, AURAS, BOSS SHOP & REWARDS)
 -- ========================================================================
+do
 local function formatNumber(n)
     n = tonumber(n) or 0
     if n >= 1e18 then return string.format("%.2fQi", n / 1e18) end
@@ -2686,8 +2694,10 @@ local function formatNumber(n)
     return tostring(math.floor(n))
 end
 
+local MASTER_EYES_CHAIN
+do
 local function E(id, name, wins, mult, world, padIndex) return { id = id, name = name, wins = wins, mult = mult, world = world, padIndex = padIndex } end
-local MASTER_EYES_CHAIN = {
+MASTER_EYES_CHAIN = {
     E("sharingan", "Sharingan", 0, 1, 1, 1), E("mangekyo", "Mangekyo Sharingan", 10, 2, 1, 2), E("geass", "Geass", 50, 3, 1, 3), E("eternal_mangekyo", "Eternal Mangekyo Sharingan", 300, 4, 1, 4),
     E("rinnegan", "Rinnegan", 2000, 7, 1, 5), E("jogan", "Jogan", 15000, 10, 1, 6), E("tenseigan", "Tenseigan", 100000, 14, 1, 7), E("rinne_sharingan", "Rinne Sharingan", 500000, 32, 1, 8),
     E("senrigan", "Senrigan", 2000000, 75, 1, 9), E("shion", "Shion\'s Dojutsu", 6000000, 170, 1, 10), E("six_eyes", "Six Eyes", 15000000, 400, 1, 11), E("kokugan", "Kokugan", 40000000, 900, 1, 12),
@@ -2721,6 +2731,7 @@ local MASTER_EYES_CHAIN = {
     E("dead_calm", "Dead Calm", 5.04e+74, 1.96e+72, 9, 7), E("biwa_castle", "Biwa Castle", 1.96e+75, 1.25e+73, 9, 8), E("destructive_death", "Destructive Death", 7.65e+75, 8.11e+73, 9, 9), E("cryo_lotus", "Cryo Lotus", 3.01e+76, 5.19e+74, 9, 10),
     E("demon_seal", "Demon Seal", 1.15e+77, 3.35e+75, 9, 11), E("moon_breathing", "Moon Breathing", 4.38e+77, 2.12e+76, 9, 12), E("sun_breathing", "Sun Breathing", 1.69e+78, 1.37e+77, 9, 13), E("demon_king", "Demon King", 6.45e+78, 8.71e+77, 9, 14),
 }
+end
 
 local function getEyesChain() return MASTER_EYES_CHAIN end
 
@@ -2998,6 +3009,8 @@ task.spawn(function()
     end
 end)
 
+end
+
 -- ========================================================================
 -- 14. TIỆN ÍCH TỐI ƯU TREO MÁY (ANTI-AFK & FPS BOOST & WALKSPEED)
 -- ========================================================================
@@ -3083,6 +3096,7 @@ end)
 -- ========================================================================
 -- 15. HỆ THỐNG TỰ ĐỘNG LƯU & NẠP CẤU HÌNH (AUTO-SAVE / AUTO-LOAD DUAL-LAYER)
 -- ========================================================================
+do
 local CONFIG_KEYS = {
     "AnimeEyes_AutoStage", "AnimeEyes_TargetStage", "AnimeEyes_SelectedWorld",
     "AnimeEyes_StageTimeout", "AnimeEyes_StageCPS", "AnimeEyes_StageDelay",
@@ -3184,3 +3198,4 @@ pcall(function()
 end)
 
 Notification("SuiSuiHUB", "Anime Eyes v19.5: Đã bật Tự Động Lưu Cấu Hình & Tối Ưu Hóa!", 4)
+end

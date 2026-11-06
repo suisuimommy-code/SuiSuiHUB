@@ -88,12 +88,8 @@ library.theme = {
 	itemscolor = Color3.fromRGB(226, 232, 240),
 	itemscolor2 = Color3.fromRGB(241, 245, 249)
 };
-if (_G.Color == nil) then
-	_G.Color = Color3.fromRGB(168, 85, 247);
-end
-if (_G.Color2 == nil) then
-	_G.Color2 = Color3.fromRGB(216, 180, 254);
-end
+_G.Color = Color3.fromRGB(168, 85, 247);
+_G.Color2 = Color3.fromRGB(216, 180, 254);
 local players = game:GetService("Players");
 local uis = game:GetService("UserInputService");
 local runservice = game:GetService("RunService");
@@ -575,7 +571,7 @@ library.CreateWindow = function(self, name, hidebutton)
 	window.NameLabel.Name = "title";
 	window.NameLabel.Position = UDim2.fromOffset(6, -2);
 	window.NameLabel.BackgroundTransparency = 1;
-	window.NameLabel.Size = UDim2.new(1, -12, 0, (window.TopBar.AbsoluteSize.Y / 2) - 2);
+	window.NameLabel.Size = UDim2.new(1, -12, 0, (window.TopBar.Size.Y.Offset / 2) - 2);
 	window.NameLabel.TextSize = window.theme.titlesize;
 	updateevent.Event:Connect(function(theme)
 		window.NameLabel.TextColor3 = theme.toptextcolor;
@@ -584,7 +580,7 @@ library.CreateWindow = function(self, name, hidebutton)
 	end);
 	window.Line2 = Instance.new("Frame", window.TopBar);
 	window.Line2.Name = "line";
-	window.Line2.Position = UDim2.fromOffset(0, window.TopBar.AbsoluteSize.Y / 2.1);
+	window.Line2.Position = UDim2.fromOffset(0, window.TopBar.Size.Y.Offset / 2.1);
 	window.Line2.Size = UDim2.fromOffset(window.size.X.Offset, 1);
 	window.Line2.BorderSizePixel = 0;
 	window.Line2.BackgroundColor3 = window.theme.accentcolor;
@@ -594,8 +590,8 @@ library.CreateWindow = function(self, name, hidebutton)
 	window.TabList = Instance.new("ScrollingFrame", window.TopBar);
 	window.TabList.Name = "tablist";
 	window.TabList.BackgroundTransparency = 1;
-	window.TabList.Position = UDim2.fromOffset(0, (window.TopBar.AbsoluteSize.Y / 2) + 1);
-	window.TabList.Size = UDim2.fromOffset(window.size.X.Offset, window.TopBar.AbsoluteSize.Y / 2);
+	window.TabList.Position = UDim2.fromOffset(0, (window.TopBar.Size.Y.Offset / 2) + 1);
+	window.TabList.Size = UDim2.fromOffset(window.size.X.Offset, window.TopBar.Size.Y.Offset / 2);
 	window.TabList.BorderSizePixel = 0;
 	window.TabList.ScrollBarThickness = 0;
 	window.TabList.ScrollingDirection = Enum.ScrollingDirection.X;
@@ -611,7 +607,7 @@ library.CreateWindow = function(self, name, hidebutton)
 	window.BlackLine.BorderSizePixel = 0;
 	window.BlackLine.ZIndex = 9;
 	window.BlackLine.BackgroundColor3 = window.theme.outlinecolor2;
-	window.BlackLine.Position = UDim2.fromOffset(0, window.TopBar.AbsoluteSize.Y);
+	window.BlackLine.Position = UDim2.fromOffset(0, window.TopBar.Size.Y.Offset);
 	updateevent.Event:Connect(function(theme)
 		window.BlackLine.BackgroundColor3 = theme.outlinecolor2;
 	end);
@@ -620,7 +616,7 @@ library.CreateWindow = function(self, name, hidebutton)
 	window.BackgroundImage.BorderSizePixel = 0;
 	window.BackgroundImage.ScaleType = Enum.ScaleType.Tile;
 	window.BackgroundImage.Position = window.BlackLine.Position + UDim2.fromOffset(0, 1);
-	window.BackgroundImage.Size = UDim2.fromOffset(window.size.X.Offset, (window.size.Y.Offset - window.TopBar.AbsoluteSize.Y) - 1);
+	window.BackgroundImage.Size = UDim2.fromOffset(window.size.X.Offset, (window.size.Y.Offset - window.TopBar.Size.Y.Offset) - 1);
 	window.BackgroundImage.Image = window.theme.background or "";
 	window.BackgroundImage.ImageTransparency = ((window.BackgroundImage.Image ~= "") and 0) or 1;
 	window.BackgroundImage.ImageColor3 = Color3.new();
@@ -683,20 +679,20 @@ library.CreateWindow = function(self, name, hidebutton)
 		tab.TabButton.TextYAlignment = Enum.TextYAlignment.Center;
 		tab.TabButton.BackgroundTransparency = 1;
 		tab.TabButton.BorderSizePixel = 0;
-		tab.TabButton.Size = UDim2.fromOffset(size.X + 15, window.TabList.AbsoluteSize.Y - 1);
+		tab.TabButton.Size = UDim2.fromOffset(size.X + 15, window.TabList.Size.Y.Offset - 1);
 		tab.TabButton.Name = tab.name;
 		tab.TabButton.TextSize = window.theme.fontsize;
 		updateevent.Event:Connect(function(theme)
 			local size = textservice:GetTextSize(tab.name, theme.fontsize, theme.font, Vector2.new(200, 200));
 			tab.TabButton.TextColor3 = ((tab.TabButton.Name == "SelectedTab") and theme.accentcolor) or theme.tabstextcolor;
 			tab.TabButton.Font = theme.font;
-			tab.TabButton.Size = UDim2.fromOffset(size.X + 15, window.TabList.AbsoluteSize.Y - 1);
+			tab.TabButton.Size = UDim2.fromOffset(size.X + 15, window.TabList.Size.Y.Offset - 1);
 			tab.TabButton.TextSize = theme.fontsize;
 		end);
 		tab.Left = Instance.new("ScrollingFrame", window.Frame);
 		tab.Left.Name = "leftside";
 		tab.Left.BorderSizePixel = 0;
-		tab.Left.Size = UDim2.fromOffset(window.size.X.Offset / 2, window.size.Y.Offset - (window.TopBar.AbsoluteSize.Y + 1));
+		tab.Left.Size = UDim2.fromOffset(window.size.X.Offset / 2, window.size.Y.Offset - (window.TopBar.Size.Y.Offset + 1));
 		tab.Left.BackgroundTransparency = 1;
 		tab.Left.Visible = false;
 		tab.Left.ScrollBarThickness = 4;
@@ -722,9 +718,9 @@ library.CreateWindow = function(self, name, hidebutton)
 		tab.Right.CanvasSize = UDim2.new(0, 0, 0, 0);
 		tab.Right.Visible = false;
 		tab.Right.BorderSizePixel = 0;
-		tab.Right.Size = UDim2.fromOffset(window.size.X.Offset / 2, window.size.Y.Offset - (window.TopBar.AbsoluteSize.Y + 1));
+		tab.Right.Size = UDim2.fromOffset(window.size.X.Offset / 2, window.size.Y.Offset - (window.TopBar.Size.Y.Offset + 1));
 		tab.Right.BackgroundTransparency = 1;
-		tab.Right.Position = tab.Left.Position + UDim2.fromOffset(tab.Left.AbsoluteSize.X, 0);
+		tab.Right.Position = tab.Left.Position + UDim2.fromOffset(window.size.X.Offset / 2, 0);
 		tab.RightListLayout = Instance.new("UIListLayout", tab.Right);
 		tab.RightListLayout.FillDirection = Enum.FillDirection.Vertical;
 		tab.RightListLayout.SortOrder = Enum.SortOrder.LayoutOrder;
@@ -845,7 +841,8 @@ library.CreateWindow = function(self, name, hidebutton)
 			sector.Label = Instance.new("TextLabel", sector.Main);
 			sector.Label.AnchorPoint = Vector2.new(0, 0.5);
 			sector.Label.Position = UDim2.fromOffset(12, -1);
-			sector.Label.Size = UDim2.fromOffset(math.clamp(textservice:GetTextSize(sector.name, 15, window.theme.font, Vector2.new(200, 300)).X + 13, 0, sector.Main.Size.X.Offset), size.Y);
+			sector.Label.Size = UDim2.fromOffset(math.clamp(size.X + 13, 0, sector.Main.Size.X.Offset - 16), size.Y);
+			sector.Label.TextXAlignment = Enum.TextXAlignment.Left;
 			sector.Label.BackgroundTransparency = 1;
 			sector.Label.BorderSizePixel = 0;
 			sector.Label.ZIndex = 6;
@@ -856,7 +853,7 @@ library.CreateWindow = function(self, name, hidebutton)
 			sector.Label.TextSize = 15;
 			updateevent.Event:Connect(function(theme)
 				local size = textservice:GetTextSize(sector.name, 15, theme.font, Vector2.new(2000, 2000));
-				sector.Label.Size = UDim2.fromOffset(math.clamp(textservice:GetTextSize(sector.name, 15, theme.font, Vector2.new(200, 300)).X + 13, 0, sector.Main.Size.X.Offset), size.Y);
+				sector.Label.Size = UDim2.fromOffset(math.clamp(size.X + 13, 0, sector.Main.Size.X.Offset - 16), size.Y);
 				sector.Label.Font = theme.font;
 			end);
 			sector.LabelBackFrame = Instance.new("Frame", sector.Main);
@@ -1069,7 +1066,7 @@ library.CreateWindow = function(self, name, hidebutton)
 				toggle.Label.AutoButtonColor = false;
 				toggle.Label.BackgroundColor3 = Color3.fromRGB(255, 255, 255);
 				toggle.Label.BackgroundTransparency = 1;
-				toggle.Label.Position = UDim2.fromOffset(toggle.Main.AbsoluteSize.X + 10, -2);
+				toggle.Label.Position = UDim2.fromOffset(toggle.Main.Size.X.Offset + 10, -2);
 				toggle.Label.Size = UDim2.fromOffset(sector.Main.Size.X.Offset - 71, toggle.BlackOutline.Size.Y.Offset);
 				toggle.Label.Font = window.theme.font;
 				toggle.Label.ZIndex = 5;
@@ -1096,7 +1093,7 @@ library.CreateWindow = function(self, name, hidebutton)
 				toggle.Items = Instance.new("Frame", toggle.Main);
 				toggle.Items.Name = "\n";
 				toggle.Items.ZIndex = 4;
-				toggle.Items.Size = UDim2.fromOffset(60, toggle.BlackOutline.AbsoluteSize.Y);
+				toggle.Items.Size = UDim2.fromOffset(60, toggle.BlackOutline.Size.Y.Offset);
 				toggle.Items.BorderSizePixel = 0;
 				toggle.Items.BackgroundTransparency = 1;
 				toggle.Items.BackgroundColor3 = Color3.new(0, 0, 0);
@@ -1714,7 +1711,7 @@ library.CreateWindow = function(self, name, hidebutton)
 						if (slider.flag and (slider.flag ~= "")) then
 							library.flags[slider.flag] = slider.value;
 						end
-						slider.SlideBar:TweenSize(UDim2.fromOffset(percent * slider.Main.AbsoluteSize.X, slider.Main.AbsoluteSize.Y), Enum.EasingDirection.In, Enum.EasingStyle.Sine, 0.05);
+						slider.SlideBar:TweenSize(UDim2.fromOffset(percent * slider.Main.Size.X.Offset, slider.Main.Size.Y.Offset), Enum.EasingDirection.In, Enum.EasingStyle.Sine, 0.05);
 						slider.InputLabel.Text = slider.value;
 						pcall(slider.callback, slider.value);
 					end;
@@ -2017,7 +2014,7 @@ library.CreateWindow = function(self, name, hidebutton)
 					if (slider.flag and (slider.flag ~= "")) then
 						library.flags[slider.flag] = slider.value;
 					end
-					slider.SlideBar:TweenSize(UDim2.fromOffset(percent * slider.Main.AbsoluteSize.X, slider.Main.AbsoluteSize.Y), Enum.EasingDirection.In, Enum.EasingStyle.Sine, 0.05);
+					slider.SlideBar:TweenSize(UDim2.fromOffset(percent * slider.Main.Size.X.Offset, slider.Main.Size.Y.Offset), Enum.EasingDirection.In, Enum.EasingStyle.Sine, 0.05);
 					slider.InputLabel.Text = slider.value;
 					pcall(slider.callback, slider.value);
 				end;

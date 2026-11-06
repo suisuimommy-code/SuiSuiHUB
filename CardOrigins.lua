@@ -17,10 +17,12 @@ local UserInputService = game:GetService("UserInputService")
 local localPlayer = Players.LocalPlayer
 
 local function safeLog(...)
+    if _G.DisableConsoleLogs then return end
     pcall(function(...) print(...) end, ...)
 end
 
 local function safeWarn(...)
+    if _G.DisableConsoleLogs then return end
     pcall(function(...) warn(...) end, ...)
 end
 
@@ -196,6 +198,7 @@ _G.BossDelay = _G.BossDelay or 0.5
 _G.RiftNotify = _G.RiftNotify or true
 _G.AutoRiftGate = _G.AutoRiftGate or false
 _G.AntiAFK = _G.AntiAFK or true
+_G.DisableConsoleLogs = _G.DisableConsoleLogs or false
 _G.WhiteScreen = _G.WhiteScreen or false
 _G.FPSBoost = _G.FPSBoost or false
 _G.HideMenuOnStartup = _G.HideMenuOnStartup or false
@@ -210,11 +213,22 @@ local lastDefeatedBossTime = {}
 -- ========================================================================
 -- 4. HỆ THỐNG LƯU / TẢI CẤU HÌNH (PERSISTENT CONFIG)
 -- ========================================================================
-local CONFIG_FILE_NAME = "SuiSuiHUB_CardOrigins_Config.json"
+local CONFIG_DIR = "!SuiSuiHUB/Card Origins"
+local CONFIG_FILE_NAME = CONFIG_DIR .. "/config.json"
+
+local function ensureConfigDir()
+    pcall(function()
+        if isfolder and makefolder then
+            if not isfolder("!SuiSuiHUB") then makefolder("!SuiSuiHUB") end
+            if not isfolder(CONFIG_DIR) then makefolder(CONFIG_DIR) end
+        end
+    end)
+end
 
 local function saveConfig()
     pcall(function()
         if not writefile then return end
+        ensureConfigDir()
         local cfg = {
             SelectedMap = _G.SelectedMap,
             SelectedMiniBosses = _G.SelectedMiniBosses,
@@ -228,6 +242,7 @@ local function saveConfig()
             RiftNotify = _G.RiftNotify,
             AutoRiftGate = _G.AutoRiftGate,
             AntiAFK = _G.AntiAFK,
+            DisableConsoleLogs = _G.DisableConsoleLogs,
             WhiteScreen = _G.WhiteScreen,
             FPSBoost = _G.FPSBoost,
             HideMenuOnStartup = _G.HideMenuOnStartup,
@@ -241,8 +256,14 @@ end
 local function loadConfig()
     pcall(function()
         if not isfile or not readfile then return end
-        if isfile(CONFIG_FILE_NAME) then
-            local data = HttpService:JSONDecode(readfile(CONFIG_FILE_NAME))
+        ensureConfigDir()
+        -- Tự động migrate file cũ nếu có
+        local targetFile = CONFIG_FILE_NAME
+        if not isfile(targetFile) and isfile("SuiSuiHUB_CardOrigins_Config.json") then
+            targetFile = "SuiSuiHUB_CardOrigins_Config.json"
+        end
+        if isfile(targetFile) then
+            local data = HttpService:JSONDecode(readfile(targetFile))
             if data then
                 if data.SelectedMap ~= nil then _G.SelectedMap = data.SelectedMap end
                 if data.SelectedMiniBosses ~= nil then _G.SelectedMiniBosses = data.SelectedMiniBosses end
@@ -258,6 +279,7 @@ local function loadConfig()
                 if data.RiftNotify ~= nil then _G.RiftNotify = data.RiftNotify end
                 if data.AutoRiftGate ~= nil then _G.AutoRiftGate = data.AutoRiftGate end
                 if data.AntiAFK ~= nil then _G.AntiAFK = data.AntiAFK end
+                if data.DisableConsoleLogs ~= nil then _G.DisableConsoleLogs = data.DisableConsoleLogs end
                 if data.WhiteScreen ~= nil then _G.WhiteScreen = data.WhiteScreen end
                 if data.FPSBoost ~= nil then _G.FPSBoost = data.FPSBoost end
                 if data.HideMenuOnStartup ~= nil then _G.HideMenuOnStartup = data.HideMenuOnStartup end
@@ -1174,6 +1196,12 @@ local SecSetRight = TabSettings:CreateSector("Hệ Thống & Giao Diện", "righ
 SecSetLeft:AddToggle("Chống Văng (Anti-AFK)", _G.AntiAFK, function(v)
     _G.AntiAFK = v
     if uiFullyLoaded then saveConfig() end
+end)
+
+SecSetLeft:AddToggle("Ẩn Nhật Ký Console (Tối Ưu FPS Khi Treo Máy)", _G.DisableConsoleLogs, function(v)
+    _G.DisableConsoleLogs = v
+    if uiFullyLoaded then saveConfig() end
+    Notification("Nhật Ký Console", v and "Đã ẨN toàn bộ log Console (Tối ưu RAM/FPS treo máy qua đêm)!" or "Đã BẬT lại log Console!", 3)
 end)
 
 SecSetLeft:AddToggle("Màn Hình Trắng Giảm CPU (WhiteScreen)", _G.WhiteScreen, function(v)

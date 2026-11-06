@@ -100,7 +100,27 @@ local runservice = game:GetService("RunService");
 local tweenservice = game:GetService("TweenService");
 local marketplaceservice = game:GetService("MarketplaceService");
 local textservice = game:GetService("TextService");
-local coregui = game:GetService("CoreGui");
+local coregui = (function()
+	if gethui then
+		local ok, h = pcall(gethui)
+		if ok and h then return h end
+	end
+	local okCore, cg = pcall(function() return game:GetService("CoreGui") end)
+	if okCore and cg then
+		local canParent = pcall(function()
+			local test = Instance.new("Folder")
+			test.Parent = cg
+			test:Destroy()
+		end)
+		if canParent then return cg end
+	end
+	local lp = game:GetService("Players").LocalPlayer
+	if lp then
+		local pg = lp:FindFirstChild("PlayerGui")
+		if pg then return pg end
+	end
+	return game:GetService("CoreGui")
+end)();
 local httpservice = game:GetService("HttpService");
 local player = players.LocalPlayer;
 local mouse = player:GetMouse();
@@ -137,30 +157,65 @@ if (library.theme.cursor and Drawing) then
 		library.cursor:Remove();
 	end
 end
-library.ConfigSystem = function(self, name)
-	if not isfolder("!SuiSuiHUB") then
-		makefolder("!SuiSuiHUB");
+library.ConfigSystem = function(self, name, customGame)
+	if isfolder and makefolder then
+		if not isfolder("!SuiSuiHUB") then
+			pcall(makefolder, "!SuiSuiHUB");
+		end
 	end
+
+	local detectedGame = customGame or _G.SuiSuiGameName;
+	if not detectedGame then
+		pcall(function()
+			local pid = game.PlaceId;
+			if pid == 97617452700163 then
+				detectedGame = "Anime Eyes";
+			elseif pid == 78312396550517 then
+				detectedGame = "Card Origins";
+			elseif pid == 6938803436 or pid == 6990129309 or pid == 6990133340 or pid == 6990131029 or pid == 7338881230 or pid == 7274690025 then
+				detectedGame = "Anime Dimensions";
+			else
+				local info = marketplaceservice:GetProductInfo(pid);
+				detectedGame = (info and info.Name) or tostring(pid);
+			end
+		end);
+	end
+	detectedGame = tostring(detectedGame or "General"):gsub('[\\/:%*%?"<>|]', "");
+
+	local gameFolder = "!SuiSuiHUB/" .. detectedGame;
+	if isfolder and makefolder then
+		if not isfolder(gameFolder) then
+			pcall(makefolder, gameFolder);
+		end
+	end
+
 	local configSystem = {};
-	configSystem.configFolder = "!SuiSuiHUB/" .. tostring(game.Players.LocalPlayer.Name) .. "";
-	if not isfolder(configSystem.configFolder) then
-		makefolder(tostring(configSystem.configFolder));
+	configSystem.gameFolder = gameFolder;
+	configSystem.configFolder = gameFolder;
+	local configName = tostring(name or "config");
+	local filePath = gameFolder .. "/" .. configName .. ".txt";
+
+	if isfile and writefile then
+		if not isfile(filePath) then
+			pcall(writefile, filePath, "{}");
+		end
 	end
-	if not isfile(configSystem.configFolder .. "/" .. name .. ".txt") then
-		writefile(configSystem.configFolder .. "/" .. name .. ".txt", "[]");
-	end
+
 	configSystem.Load = function(self)
-		local Success = pcall(readfile, configSystem.configFolder .. "/" .. name .. ".txt");
-		if Success then
+		if not isfile or not readfile then return end
+		local Success, Content = pcall(readfile, filePath);
+		if Success and Content and #Content > 1 then
 			pcall(function()
-				local ReadConfig = httpservice:JSONDecode(readfile(configSystem.configFolder .. "/" .. name .. ".txt"));
+				local ReadConfig = httpservice:JSONDecode(Content);
 				local NewConfig = {};
 				for i, v in pairs(ReadConfig) do
 					if (typeof(v) == "table") then
-						if (typeof(v[1]) == "number") then
+						if (typeof(v[1]) == "number") and #v == 3 then
 							NewConfig[i] = Color3.new(v[1], v[2], v[3]);
 						elseif (typeof(v[1]) == "table") then
 							NewConfig[i] = v[1];
+						else
+							NewConfig[i] = v;
 						end
 					elseif (tostring(v):find("Enum.KeyCode.")) then
 						NewConfig[i] = Enum.KeyCode[tostring(v):gsub("Enum.KeyCode.", "")];
@@ -171,36 +226,36 @@ library.ConfigSystem = function(self, name)
 				library.flags = NewConfig;
 				for i, v in pairs(library.flags) do
 					for i2, v2 in pairs(library.items) do
-						if ((i ~= nil) and (i ~= "") and (i ~= "Configs_Name") and (i ~= "Configs") and (v2.flag ~= nil)) then
-							if (v2.flag == i) then
-								pcall(function()
-									v2:Set(v);
-									-- print(v2.flag, v);
-								end);
-							end
+						if (v2.flag and v2.flag == i) then
+							pcall(function()
+								v2:Set(v);
+							end);
 						end
 					end
 				end
 			end);
 		end
 	end;
+
 	configSystem.Save = function(self)
-		config = {};
+		if not writefile then return end
+		local config = {};
 		for i, v in pairs(library.flags) do
-			if ((v ~= nil) and (v ~= "")) then
+			if (v ~= nil and v ~= "") then
 				if (typeof(v) == "Color3") then
-					config[i] = {v.R,v.G,v.B};
-				elseif (tostring(v):find("Enum.KeyCode")) then
+					config[i] = {v.R, v.G, v.B};
+				elseif (typeof(v) == "EnumItem" and tostring(v):find("Enum.KeyCode")) then
 					config[i] = "Enum.KeyCode." .. v.Name;
 				elseif (typeof(v) == "table") then
-					config[i] = {v};
+					config[i] = v;
 				else
 					config[i] = v;
 				end
 			end
 		end
-		writefile(configSystem.configFolder .. "/" .. name .. ".txt", httpservice:JSONEncode(config));
+		pcall(writefile, filePath, httpservice:JSONEncode(config));
 	end;
+
 	return configSystem;
 end;
 local UserInputService = game:GetService("UserInputService");
@@ -415,14 +470,42 @@ library.CreateWindow = function(self, name, hidebutton)
 	window.Frame.Text = "";
 	window.Frame.BackgroundColor3 = window.theme.backgroundcolor;
 	window.Frame.AnchorPoint = Vector2.new(0.5, 0.5);
+	window.UIScale = Instance.new("UIScale", window.Frame);
+	local function updateWindowScale()
+		pcall(function()
+			local cam = workspace.CurrentCamera;
+			if not cam then return end
+			local vp = cam.ViewportSize;
+			if vp.X > 0 and vp.Y > 0 then
+				local scaleX = (vp.X - 24) / 660;
+				local scaleY = (vp.Y - 48) / 420;
+				window.UIScale.Scale = math.clamp(math.min(scaleX, scaleY, 1), 0.62, 1);
+			end
+		end);
+	end
+	updateWindowScale();
+	if workspace.CurrentCamera then
+		trackConn(workspace.CurrentCamera:GetPropertyChangedSignal("ViewportSize"):Connect(updateWindowScale));
+	end
 	updateevent.Event:Connect(function(theme)
 		window.Frame.BackgroundColor3 = theme.backgroundcolor;
 	end);
 	local c_whide = uis.InputBegan:Connect(function(key)
 		if (key.KeyCode == window.hidebutton) then
-			for i, v in pairs(game:GetService("CoreGui"):GetChildren()) do
-				if v:FindFirstChild("main") then
-					v.main.Visible = not v.main.Visible;
+			if window.Frame then
+				window.Frame.Visible = not window.Frame.Visible;
+			elseif getgenv().uilib and getgenv().uilib:FindFirstChild("main") then
+				getgenv().uilib.main.Visible = not getgenv().uilib.main.Visible;
+			else
+				local containers = {};
+				if gethui then pcall(function() table.insert(containers, gethui()) end) end
+				pcall(function() table.insert(containers, game:GetService("CoreGui")) end)
+				for _, c in ipairs(containers) do
+					for _, v in pairs(c:GetChildren()) do
+						if v:FindFirstChild("main") then
+							v.main.Visible = not v.main.Visible;
+						end
+					end
 				end
 			end
 		end
@@ -685,9 +768,15 @@ library.CreateWindow = function(self, name, hidebutton)
 		if (#window.Tabs == 0) then
 			tab:SelectTab();
 		end
-		tab.TabButton.MouseButton1Down:Connect(function()
+		local lastTabClick = 0;
+		local function onTabTrigger()
+			local now = tick();
+			if (now - lastTabClick) < 0.15 then return end;
+			lastTabClick = now;
 			tab:SelectTab();
-		end);
+		end
+		tab.TabButton.Activated:Connect(onTabTrigger);
+		tab.TabButton.MouseButton1Click:Connect(onTabTrigger);
 		tab.SectorsLeft = {};
 		tab.SectorsRight = {};
 		tab.CreateSector = function(self, name, side)
@@ -820,7 +909,7 @@ library.CreateWindow = function(self, name, hidebutton)
 				button.Main.AutoButtonColor = false;
 				button.Main.Name = "button";
 				button.Main.ZIndex = 5;
-				button.Main.Size = UDim2.fromOffset(sector.Main.Size.X.Offset - 12, 14);
+				button.Main.Size = UDim2.fromOffset(sector.Main.Size.X.Offset - 12, 18);
 				button.Main.BackgroundColor3 = Color3.fromRGB(255, 255, 255);
 				button.Gradient = Instance.new("UIGradient", button.Main);
 				button.Gradient.Rotation = 90;
@@ -870,7 +959,15 @@ library.CreateWindow = function(self, name, hidebutton)
 				button.Label.TextSize = 15;
 				button.Label.TextStrokeTransparency = 1;
 				button.Label.TextXAlignment = Enum.TextXAlignment.Center;
-				button.Main.MouseButton1Down:Connect(button.callback);
+				local lastBtnClick = 0;
+				local function onBtnTrigger()
+					local now = tick();
+					if (now - lastBtnClick) < 0.18 then return end;
+					lastBtnClick = now;
+					pcall(button.callback);
+				end
+				button.Main.Activated:Connect(onBtnTrigger);
+				button.Main.MouseButton1Click:Connect(onBtnTrigger);
 				updateevent.Event:Connect(function(theme)
 					button.Label.Font = theme.font;
 					button.Label.TextColor3 = theme.itemscolor;
@@ -1622,52 +1719,51 @@ library.CreateWindow = function(self, name, hidebutton)
 						pcall(slider.callback, slider.value);
 					end;
 					slider:Set(slider.default);
-					slider.Refresh = function(self)
-						local mousePos = camera:WorldToViewportPoint(mouse.Hit.p);
-						local percent = math.clamp(mousePos.X - slider.SlideBar.AbsolutePosition.X, 0, slider.Main.AbsoluteSize.X) / slider.Main.AbsoluteSize.X;
+					slider.Refresh = function(self, inputX)
+						local posX = inputX or (mouse and mouse.X) or 0;
+						local width = math.max(slider.Main.AbsoluteSize.X, 1);
+						local percent = math.clamp(posX - slider.Main.AbsolutePosition.X, 0, width) / width;
 						local value = math.floor((slider.min + ((slider.max - slider.min) * percent)) * slider.decimals) / slider.decimals;
 						value = math.clamp(value, slider.min, slider.max);
 						slider:Set(value);
 					end;
-					slider.SlideBar.InputBegan:Connect(function(input)
-						if (input.UserInputType == Enum.UserInputType.MouseButton1) then
+					local function startSlide(input)
+						if (input.UserInputType == Enum.UserInputType.MouseButton1) or (input.UserInputType == Enum.UserInputType.Touch) then
 							dragging = true;
-							slider:Refresh();
+							pcall(function() sector.Main.Parent.ScrollingEnabled = false end);
+							slider:Refresh(input.Position and input.Position.X);
 						end
-					end);
-					slider.SlideBar.InputEnded:Connect(function(input)
-						if (input.UserInputType == Enum.UserInputType.MouseButton1) then
+					end
+					local function endSlide(input)
+						if (input.UserInputType == Enum.UserInputType.MouseButton1) or (input.UserInputType == Enum.UserInputType.Touch) then
 							dragging = false;
+							pcall(function() sector.Main.Parent.ScrollingEnabled = true end);
 						end
-					end);
-					slider.Main.InputBegan:Connect(function(input)
-						if (input.UserInputType == Enum.UserInputType.MouseButton1) then
-							dragging = true;
-							slider:Refresh();
-						end
-					end);
-					slider.Main.InputEnded:Connect(function(input)
-						if (input.UserInputType == Enum.UserInputType.MouseButton1) then
-							dragging = false;
-						end
-					end);
+					end
+					slider.SlideBar.InputBegan:Connect(startSlide);
+					slider.SlideBar.InputEnded:Connect(endSlide);
+					slider.Main.InputBegan:Connect(startSlide);
+					slider.Main.InputEnded:Connect(endSlide);
 					uis.InputChanged:Connect(function(input)
-						if (dragging and (input.UserInputType == Enum.UserInputType.MouseMovement)) then
-							slider:Refresh();
+						if dragging and ((input.UserInputType == Enum.UserInputType.MouseMovement) or (input.UserInputType == Enum.UserInputType.Touch)) then
+							slider:Refresh(input.Position and input.Position.X);
 						end
 					end);
 					sector:FixSize();
 					table.insert(library.items, slider);
 					return slider;
 				end;
-				toggle.Main.MouseButton1Down:Connect(function()
+				local lastToggleTime = 0;
+				local function onToggleTrigger()
+					local now = tick();
+					if (now - lastToggleTime) < 0.18 then return end;
+					lastToggleTime = now;
 					toggle:Set(not toggle.CheckedFrame.Visible);
-				end);
-				toggle.Label.InputBegan:Connect(function(input)
-					if (input.UserInputType == Enum.UserInputType.MouseButton1) then
-						toggle:Set(not toggle.CheckedFrame.Visible);
-					end
-				end);
+				end
+				toggle.Main.Activated:Connect(onToggleTrigger);
+				toggle.Main.MouseButton1Click:Connect(onToggleTrigger);
+				toggle.Label.Activated:Connect(onToggleTrigger);
+				toggle.Label.MouseButton1Click:Connect(onToggleTrigger);
 				local MouseEnter = function()
 					toggle.BlackOutline2.BackgroundColor3 = window.theme.accentcolor;
 				end;
@@ -1915,7 +2011,8 @@ library.CreateWindow = function(self, name, hidebutton)
 				end;
 				slider.Set = function(self, value)
 					local dec = (slider.decimals and slider.decimals > 0) and slider.decimals or 1;
-					slider.value = math.clamp(math.round(value * dec) / dec, slider.min, slider.max);
+					local rounded = (dec < 1) and (math.round(value / dec) * dec) or (math.round(value * dec) / dec);
+					slider.value = tonumber(string.format("%.4f", math.clamp(rounded, slider.min, slider.max))) or slider.min;
 					local percent = 1 - ((slider.max - slider.value) / (slider.max - slider.min));
 					if (slider.flag and (slider.flag ~= "")) then
 						library.flags[slider.flag] = slider.value;
@@ -1929,45 +2026,44 @@ library.CreateWindow = function(self, name, hidebutton)
 					if not Return then
 						return;
 					end
-					if (slider.InputLabel.Text:match("^%d+$")) then
-						slider:Set(tonumber(slider.InputLabel.Text));
+					local numVal = tonumber(slider.InputLabel.Text);
+					if numVal then
+						slider:Set(numVal);
 					else
 						slider.InputLabel.Text = tostring(slider.value);
 					end
 				end);
-				slider.Refresh = function(self)
+				slider.Refresh = function(self, inputX)
 					local dec = (slider.decimals and slider.decimals > 0) and slider.decimals or 1;
-					local mousePos = camera:WorldToViewportPoint(mouse.Hit.p);
-					local percent = math.clamp(mousePos.X - slider.SlideBar.AbsolutePosition.X, 0, slider.Main.AbsoluteSize.X) / slider.Main.AbsoluteSize.X;
-					local value = math.floor((slider.min + ((slider.max - slider.min) * percent)) * dec) / dec;
-					value = math.clamp(value, slider.min, slider.max);
+					local posX = inputX or (mouse and mouse.X) or 0;
+					local width = math.max(slider.Main.AbsoluteSize.X, 1);
+					local percent = math.clamp(posX - slider.Main.AbsolutePosition.X, 0, width) / width;
+					local rawVal = slider.min + ((slider.max - slider.min) * percent);
+					local rounded = (dec < 1) and (math.round(rawVal / dec) * dec) or (math.round(rawVal * dec) / dec);
+					local value = tonumber(string.format("%.4f", math.clamp(rounded, slider.min, slider.max))) or slider.min;
 					slider:Set(value);
 				end;
-				slider.SlideBar.InputBegan:Connect(function(input)
-					if (input.UserInputType == Enum.UserInputType.MouseButton1) then
+				local function startSliderDrag(input)
+					if (input.UserInputType == Enum.UserInputType.MouseButton1) or (input.UserInputType == Enum.UserInputType.Touch) then
 						dragging = true;
-						slider:Refresh();
+						pcall(function() sector.Main.Parent.ScrollingEnabled = false end);
+						slider:Refresh(input.Position and input.Position.X);
 					end
-				end);
-				slider.SlideBar.InputEnded:Connect(function(input)
-					if (input.UserInputType == Enum.UserInputType.MouseButton1) then
+				end
+				local function endSliderDrag(input)
+					if (input.UserInputType == Enum.UserInputType.MouseButton1) or (input.UserInputType == Enum.UserInputType.Touch) then
 						dragging = false;
+						pcall(function() sector.Main.Parent.ScrollingEnabled = true end);
 					end
-				end);
-				slider.Main.InputBegan:Connect(function(input)
-					if (input.UserInputType == Enum.UserInputType.MouseButton1) then
-						dragging = true;
-						slider:Refresh();
-					end
-				end);
-				slider.Main.InputEnded:Connect(function(input)
-					if (input.UserInputType == Enum.UserInputType.MouseButton1) then
-						dragging = false;
-					end
-				end);
+				end
+				slider.SlideBar.InputBegan:Connect(startSliderDrag);
+				slider.SlideBar.InputEnded:Connect(endSliderDrag);
+				slider.Main.InputBegan:Connect(startSliderDrag);
+				slider.Main.InputEnded:Connect(endSliderDrag);
+				uis.InputEnded:Connect(endSliderDrag);
 				uis.InputChanged:Connect(function(input)
-					if (dragging and (input.UserInputType == Enum.UserInputType.MouseMovement)) then
-						slider:Refresh();
+					if dragging and ((input.UserInputType == Enum.UserInputType.MouseMovement) or (input.UserInputType == Enum.UserInputType.Touch)) then
+						slider:Refresh(input.Position and input.Position.X);
 					end
 				end);
 				sector:FixSize();
@@ -2600,7 +2696,9 @@ library.CreateWindow = function(self, name, hidebutton)
 			return sector;
 		end;
 		pcall(function()
-			makefolder("!SLH_Hub");
+			if isfolder and makefolder and not isfolder("!SuiSuiHUB") then
+				makefolder("!SuiSuiHUB");
+			end
 		end);
 		table.insert(window.Tabs, tab);
 		return tab;
@@ -2632,7 +2730,7 @@ if not game:GetService("CoreGui"):FindFirstChild("StatBySmell") then
 	local UIStroke3 = Instance.new("UIStroke");
 
 	GuiStat.Name = "StatBySmell";
-	GuiStat.Parent = game:GetService("CoreGui");
+	GuiStat.Parent = coregui;
 	GuiStat.ResetOnSpawn = false;
 	GuiStat.ZIndexBehavior = Enum.ZIndexBehavior.Sibling;
 	GuiStat.IgnoreGuiInset = true;
@@ -2785,13 +2883,45 @@ if not game:GetService("CoreGui"):FindFirstChild("StatBySmell") then
 	IconLabel_3.TextSize = 14;
 	IconLabel_3.TextXAlignment = Enum.TextXAlignment.Left;
 
-	IconButton_3.MouseButton1Click:Connect(function()
-		for i, v in pairs(game:GetService("CoreGui"):GetChildren()) do
-			if v:FindFirstChild("main") then
-				v.main.Visible = not v.main.Visible;
+	local lastMenuToggle = 0;
+	local function toggleHubMenu()
+		local now = tick();
+		if (now - lastMenuToggle) < 0.2 then return end;
+		lastMenuToggle = now;
+		local found = false;
+		if getgenv().uilib then
+			pcall(function()
+				local m = getgenv().uilib:FindFirstChild("main");
+				if m then
+					m.Visible = not m.Visible;
+					found = true;
+				end
+			end);
+		end
+		if not found then
+			local containers = {};
+			if gethui then pcall(function() table.insert(containers, gethui()) end) end
+			pcall(function() table.insert(containers, game:GetService("CoreGui")) end)
+			pcall(function()
+				local lp = game:GetService("Players").LocalPlayer;
+				if lp and lp:FindFirstChild("PlayerGui") then table.insert(containers, lp.PlayerGui) end
+			end);
+			for _, c in ipairs(containers) do
+				pcall(function()
+					for _, v in pairs(c:GetChildren()) do
+						local m = v:FindFirstChild("main");
+						if m then
+							m.Visible = not m.Visible;
+							found = true;
+						end
+					end
+				end);
+				if found then break end
 			end
 		end
-	end);
+	end
+	IconButton_3.Activated:Connect(toggleHubMenu);
+	IconButton_3.MouseButton1Click:Connect(toggleHubMenu);
 
 	-- FPS & Ping Loop (Không Rainbow, siêu nhẹ)
 	local RS = game:GetService("RunService");

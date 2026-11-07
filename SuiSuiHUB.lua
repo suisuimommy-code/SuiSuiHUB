@@ -46,6 +46,7 @@ local GameDatabase = {
         },
         UniverseIds = {},
         Paths = {
+            "AnimeEyes.lua",
             "Anime Eyes/AnimeEyes.lua"
         },
         SignatureCheck = function()
@@ -69,6 +70,7 @@ local GameDatabase = {
         },
         UniverseIds = {},
         Paths = {
+            "ADS.lua",
             "anime dimesion/ADS.lua",
             "Anime dimesion/ADS.lua"
         }
@@ -81,6 +83,7 @@ local GameDatabase = {
         },
         UniverseIds = {},
         Paths = {
+            "CardOrigins.lua",
             "Card Origins/CardOrigins.lua"
         }
     }

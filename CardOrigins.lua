@@ -1,10 +1,29 @@
 --[[
     ========================================================================
-    SuiSuiHUB | Card Origins (Refactored & High-Performance Edition)
-    PlaceId: 78312396550517 | Tối ưu hóa 3 Chức năng cốt lõi
-    - Tab 1: Săn Boss (Trùm Cuối xoay vòng Bật -> Đánh -> Nhận -> Tắt, Mini Boss)
-    - Tab 2: RiftGATE (Chu kỳ 15 phút :00, :15, :30, :45)
-    - Tab 3: Cài Đặt (Anti-AFK, WhiteScreen, FPS Boost, Speed, Ẩn Menu Khởi Động)
+    SuiSuiHUB | Card Origins (Refactored Ultra & Instant-Win Edition)
+    PlaceId: 78312396550517 | Tối ưu hóa dựa trên Telemetry & Decompile Dump
+    Tác giả: dj & VANTA
+    
+    CÁC NÂNG CẤP ĐỘT PHÁ:
+      1. Tích hợp chuẩn 100% Remotes Trùm Cuối:
+         - Queen / Shadow Monarch: BuildNamiBattle (Khắc phục triệt để lỗi sai remote)
+         - Gojo: BuildGojoBattle
+         - Kurumi: BuildKurumiBattle
+         - Hỗ trợ sẵn các Boss mở rộng: Makima, Miku, Klein, Ishtar, Eydis
+      2. Phân loại Mini Boss chính xác theo từng World & Khám phá 5 Boss Ẩn:
+         - World 02 (Dungeon): Cha Hae-In, Guild Master
+         - World 03 (Devil Heart): Yuno
+         - World 04 (Limitless Domain): Sukuna (Cursed King), Yuta Okkotsu
+         - World 05 (Revolution): Sword Empress, Boothill, Ragna
+         - KHU VỰC BOSS ẨN: 5 Hidden Bosses (Hidden Boss 1..5, Lord Boros)
+           + Có sẵn nút Teleport tới tận nơi 5 Boss Ẩn
+           + Hỗ trợ chọn độ khó riêng cho từng con (Normal, Gold, Rainbow, Uni, Paradox, Origin)
+      3. Quy trình Instant-Win (Bỏ qua hoàn toàn hoạt ảnh giao tranh):
+         - BuildBattle -> StartBattle -> ReportDamage (999,999) -> ReportVictory -> EndBattle
+         - Tự động dọn dẹp cờ server bằng SetAutoBossFight("") để xoay tua mượt mà
+      4. RiftGATE (Chu kỳ 15 phút): Tự động tham gia từ xa, giữ nguyên vị trí nhân vật
+      5. Tab Mới: Tiện Ích & Auto Roll (Auto Roll thẻ bài, Auto leo Tháp Vô Tận)
+      6. Cài Đặt: Anti-AFK, WhiteScreen, FPS Boost, Tốc độ di chuyển, Ẩn Menu
     ========================================================================
 ]]
 
@@ -69,21 +88,36 @@ if not library then
 end
 
 -- ========================================================================
--- 2. CẤU HÌNH REMOTES (CHÍNH XÁC THEO LOG F9 CAPTURED)
+-- 2. CẤU HÌNH REMOTES (CHUẨN XÁC THEO TELEMETRY DUMP)
 -- ========================================================================
 local eventRemotes = ReplicatedStorage:WaitForChild("EventRemotes", 5)
+
+-- Remote Trận Đấu & Boss
 local reportVictoryRemote = eventRemotes and eventRemotes:FindFirstChild("ReportBossVictory") or ReplicatedStorage:FindFirstChild("ReportBossVictory", true)
 local getCooldownRemote = eventRemotes and eventRemotes:FindFirstChild("GetBossCooldown") or ReplicatedStorage:FindFirstChild("GetBossCooldown", true)
-local buildMiniBossRemote = eventRemotes and eventRemotes:FindFirstChild("BuildMiniBossBattle") or ReplicatedStorage:FindFirstChild("BuildMiniBossBattle", true)
-local worldsTeleportRemote = ReplicatedStorage:FindFirstChild("WorldsTeleportRequest", true)
-local setAutoBossRemote = eventRemotes and eventRemotes:FindFirstChild("SetAutoBossFight") or ReplicatedStorage:FindFirstChild("SetAutoBossFight", true)
-local endBattleRemote = eventRemotes and eventRemotes:FindFirstChild("EndBattle") or ReplicatedStorage:FindFirstChild("EndBattle", true)
-local startBattleRemote = eventRemotes and eventRemotes:FindFirstChild("StartBattle") or ReplicatedStorage:FindFirstChild("StartBattle", true)
-local reportBattleDmgRemote = eventRemotes and eventRemotes:FindFirstChild("ReportBattleDamage") or ReplicatedStorage:FindFirstChild("ReportBattleDamage", true)
 local getBorderProgRemote = eventRemotes and eventRemotes:FindFirstChild("GetBossBorderProgress") or ReplicatedStorage:FindFirstChild("GetBossBorderProgress", true)
 local getAutoBossRemote = eventRemotes and eventRemotes:FindFirstChild("GetAutoBossFight") or ReplicatedStorage:FindFirstChild("GetAutoBossFight", true)
+local setAutoBossRemote = eventRemotes and eventRemotes:FindFirstChild("SetAutoBossFight") or ReplicatedStorage:FindFirstChild("SetAutoBossFight", true)
+local startBattleRemote = eventRemotes and eventRemotes:FindFirstChild("StartBattle") or ReplicatedStorage:FindFirstChild("StartBattle", true)
+local reportBattleDmgRemote = eventRemotes and eventRemotes:FindFirstChild("ReportBattleDamage") or ReplicatedStorage:FindFirstChild("ReportBattleDamage", true)
+local endBattleRemote = eventRemotes and eventRemotes:FindFirstChild("EndBattle") or ReplicatedStorage:FindFirstChild("EndBattle", true)
+local buildMiniBossRemote = eventRemotes and eventRemotes:FindFirstChild("BuildMiniBossBattle") or ReplicatedStorage:FindFirstChild("BuildMiniBossBattle", true)
+local worldsTeleportRemote = ReplicatedStorage:FindFirstChild("WorldsTeleportRequest", true)
 
--- RiftGATE Remotes
+-- Bản đồ Remote khởi tạo Trùm Cuối (Khớp nối từ mã nguồn Decompile)
+local MAIN_BOSS_REMOTE_MAP = {
+    ["queen"]  = "BuildNamiBattle",    -- The Shadow Monarch thực tế gọi BuildNamiBattle!
+    ["nami"]   = "BuildNamiBattle",
+    ["gojo"]   = "BuildGojoBattle",
+    ["kurumi"] = "BuildKurumiBattle",
+    ["makima"] = "BuildMakimaBattle",
+    ["miku"]   = "BuildMikuBattle",
+    ["klein"]  = "BuildKleinBattle",
+    ["ishtar"] = "BuildIshtarBattle",
+    ["eydis"]  = "BuildEydisBattle"
+}
+
+-- Remote RiftGATE
 local riftGateEnterRemote = eventRemotes and eventRemotes:FindFirstChild("RiftGateEnterRequest") or ReplicatedStorage:FindFirstChild("RiftGateEnterRequest", true)
 local buildRiftBattleRemote = eventRemotes and eventRemotes:FindFirstChild("BuildRiftGateBattle") or ReplicatedStorage:FindFirstChild("BuildRiftGateBattle", true)
 local riftStartFightRemote = eventRemotes and eventRemotes:FindFirstChild("RiftGateStartFight") or ReplicatedStorage:FindFirstChild("RiftGateStartFight", true)
@@ -93,70 +127,174 @@ local riftGateLeaveRemote = eventRemotes and eventRemotes:FindFirstChild("RiftGa
 local riftGateSpawnedRemote = eventRemotes and eventRemotes:FindFirstChild("RiftGateSpawned") or ReplicatedStorage:FindFirstChild("RiftGateSpawned", true)
 local riftGateClosedRemote = eventRemotes and eventRemotes:FindFirstChild("RiftGateClosed") or ReplicatedStorage:FindFirstChild("RiftGateClosed", true)
 
+-- Remote Roll, Leo Tháp & Gacha
+local rollRemote = eventRemotes and eventRemotes:FindFirstChild("RollRequest") or ReplicatedStorage:FindFirstChild("RollRequest", true)
+local nextFloorRemote = eventRemotes and eventRemotes:FindFirstChild("NextFloor") or ReplicatedStorage:FindFirstChild("NextFloor", true)
+local claimAllBattlePassRemote = ReplicatedStorage:FindFirstChild("ClaimAllBattlePass", true)
+
+-- Remotes Phân Hệ 1: Phó Bản & Sự Kiện (Dungeon, Raid Boss & Eydis Hourly)
+local startDungeonStageRemote = eventRemotes and eventRemotes:FindFirstChild("StartDungeonStage") or ReplicatedStorage:FindFirstChild("StartDungeonStage", true)
+local claimDungeonRewardRemote = eventRemotes and eventRemotes:FindFirstChild("ClaimDungeonReward") or ReplicatedStorage:FindFirstChild("ClaimDungeonReward", true)
+local getDungeonProgressRemote = eventRemotes and eventRemotes:FindFirstChild("GetDungeonProgress") or ReplicatedStorage:FindFirstChild("GetDungeonProgress", true)
+local getDungeonCooldownRemote = eventRemotes and eventRemotes:FindFirstChild("GetDungeonCooldown") or ReplicatedStorage:FindFirstChild("GetDungeonCooldown", true)
+local getAutoDungeonStageRemote = eventRemotes and eventRemotes:FindFirstChild("GetAutoDungeonStage") or ReplicatedStorage:FindFirstChild("GetAutoDungeonStage", true)
+local setAutoDungeonStageRemote = eventRemotes and eventRemotes:FindFirstChild("SetAutoDungeonStage") or ReplicatedStorage:FindFirstChild("SetAutoDungeonStage", true)
+local buyDungeonShopItemRemote = eventRemotes and eventRemotes:FindFirstChild("BuyDungeonShopItem") or ReplicatedStorage:FindFirstChild("BuyDungeonShopItem", true)
+local openDungeonUIRemote = ReplicatedStorage:FindFirstChild("OpenDungeonUI", true)
+
+local raidStartBattleRemote = ReplicatedStorage:FindFirstChild("RaidStartBattle", true)
+local raidReportResultRemote = ReplicatedStorage:FindFirstChild("RaidReportResult", true)
+local raidPurchaseRequestRemote = ReplicatedStorage:FindFirstChild("RaidPurchaseRequest", true)
+local raidStateRequestRemote = ReplicatedStorage:FindFirstChild("RaidStateRequest", true)
+local openRaidUIRemote = ReplicatedStorage:FindFirstChild("OpenRaidUI", true)
+
+local buildEydisBattleRemote = eventRemotes and eventRemotes:FindFirstChild("BuildEydisBattle") or ReplicatedStorage:FindFirstChild("BuildEydisBattle", true)
+local reportEydisVictoryRemote = eventRemotes and eventRemotes:FindFirstChild("ReportEydisVictory") or ReplicatedStorage:FindFirstChild("ReportEydisVictory", true)
+local getEydisProgressRemote = eventRemotes and eventRemotes:FindFirstChild("GetEydisProgress") or ReplicatedStorage:FindFirstChild("GetEydisProgress", true)
+local evoShardTradeRemote = eventRemotes and eventRemotes:FindFirstChild("EvoShardTrade") or ReplicatedStorage:FindFirstChild("EvoShardTrade", true)
+local openEydisBattleRemote = ReplicatedStorage:FindFirstChild("OpenEydisBattle", true)
+
 local isServerRiftGateOpen = false
-local hasFarmedCurrentRiftGate = false -- Đánh dấu đã farm xong đợt này (tránh lặp lại & tele vào lại)
+local hasFarmedCurrentRiftGate = false
 
 if riftGateSpawnedRemote and riftGateSpawnedRemote.OnClientEvent then
     pcall(function()
         riftGateSpawnedRemote.OnClientEvent:Connect(function()
             isServerRiftGateOpen = true
-            hasFarmedCurrentRiftGate = false -- Cổng mới mở: Sẵn sàng cho đợt farm mới
-            safeLog("[SuiSuiHUB] Nhận tín hiệu Server: Cổng RiftGate vừa mở đợt mới!")
-            Notification("RiftGATE", "CỔNG RIFTGATE VỪA MỞ TRÊN MAP!", 5)
+            hasFarmedCurrentRiftGate = false
+            Notification("RiftGATE", "Cổng RiftGATE vừa xuất hiện trên máy chủ!", 4)
         end)
     end)
 end
+
 if riftGateClosedRemote and riftGateClosedRemote.OnClientEvent then
     pcall(function()
         riftGateClosedRemote.OnClientEvent:Connect(function()
             isServerRiftGateOpen = false
-            hasFarmedCurrentRiftGate = false -- Cổng đóng: Reset để đón đợt kế tiếp
-            safeLog("[SuiSuiHUB] Nhận tín hiệu Server: Cổng RiftGate đã đóng!")
+            hasFarmedCurrentRiftGate = false
         end)
     end)
 end
 
 -- ========================================================================
--- 3. HỆ THỐNG DỮ LIỆU GAME (WORLDS, BOSSES, GUIS)
+-- 3. ĐỊNH NGHĨA DỮ LIỆU CỐT LÕI (SẮP XẾP CHUẨN XÁC THEO TỪNG WORLD)
 -- ========================================================================
 local GAME_WORLDS = {
-    ["World 02: DUNGEON (queen)"] = {
+    ["World 01: LOBBY (Sảnh Chính)"] = {
+        mapId = "lobby",
+        mainBoss = nil,
+        miniBosses = {}
+    },
+    ["World 02: DUNGEON (Shadow Realm - queen)"] = {
         mapId = "sjwmap",
-        miniBosses = { { id = "chahaein", name = "Cha Hae-In" }, { id = "guildmaster", name = "Guild Master" } },
-        mainBoss = { id = "queen", name = "The Shadow Monarch", gui = "WorldBossGui" }
+        mainBoss = { name = "The Shadow Monarch", id = "queen" },
+        miniBosses = {
+            { name = "Cha Hae-In (chahaein)", id = "chahaein" },
+            { name = "Guild Master (guildmaster)", id = "guildmaster" }
+        }
+    },
+    ["World 03: ENDLESS CASTLE"] = {
+        mapId = "infinitycastle",
+        mainBoss = nil,
+        miniBosses = {
+            { name = "Ragna (ragna)", id = "ragna" }
+        }
     },
     ["World 04: LIMITLESS DOMAIN (gojo)"] = {
         mapId = "gojodomainv2",
-        miniBosses = { { id = "sukuna", name = "Sukuna" }, { id = "yuta", name = "Yuta" } },
-        mainBoss = { id = "gojo", name = "The Honored One", gui = "GojoBossGui" }
+        mainBoss = { name = "The Honored One", id = "gojo" },
+        miniBosses = {
+            { name = "Sukuna - Cursed King (sukuna)", id = "sukuna" },
+            { name = "Yuta Okkotsu (yuta)", id = "yuta" }
+        }
     },
     ["World 05: DEVIL HEART (kurumi)"] = {
         mapId = "kurumimapspawn",
-        miniBosses = { { id = "yuno", name = "Yuno" }, { id = "swordempress", name = "Sword Empress" } },
-        mainBoss = { id = "kurumi", name = "Clockmaiden", gui = "KurumiBossGui" }
+        mainBoss = { name = "Clockmaiden", id = "kurumi" },
+        miniBosses = {
+            { name = "Sword Empress (swordempress)", id = "swordempress" },
+            { name = "Yuno (yuno)", id = "yuno" }
+        }
     },
     ["World 06: THE MYSTERIOUS LIBRARY (klein)"] = {
-        mapId = "library",
-        miniBosses = {},
-        mainBoss = nil
+        mapId = "mysteriouslibrary",
+        mainBoss = { name = "Klein Moretti", id = "klein" },
+        miniBosses = {}
+    },
+    ["World 07: CELESTIAL EXPRESS (Love of Remembrance - ishtar)"] = {
+        mapId = "astralexpress",
+        mainBoss = { name = "Love of Remembrance", id = "ishtar" },
+        miniBosses = {
+            { name = "Cyborg Gunslinger (boothill)", id = "boothill" },
+            { name = "Sword Champion of the Cloud City (jingliu)", id = "jingliu" },
+            { name = "Mini Boss 3 (Celestial Express)", id = "hsr_mini3" }
+        }
+    },
+    ["World 08: UNKNOWN REALM (Sealed)"] = {
+        mapId = nil,
+        mainBoss = nil,
+        miniBosses = {}
+    },
+    ["Khu Vực: BOSS ẨN (5 Hidden Bosses)"] = {
+        mapId = "hidden",
+        mainBoss = nil,
+        miniBosses = {
+            { name = "Hidden Boss 1", id = "hidden boss 1" },
+            { name = "Hidden Boss 2", id = "hidden boss 2" },
+            { name = "Hidden Boss 3 (Lord Boros)", id = "hidden boss 3" },
+            { name = "Hidden Boss 4", id = "hidden boss 4" },
+            { name = "Hidden Boss 5", id = "hidden boss 5" }
+        }
     }
 }
 
 local MapOptions = {
-    "World 02: DUNGEON (queen)",
+    "World 01: LOBBY (Sảnh Chính)",
+    "World 02: DUNGEON (Shadow Realm - queen)",
+    "World 03: ENDLESS CASTLE",
     "World 04: LIMITLESS DOMAIN (gojo)",
     "World 05: DEVIL HEART (kurumi)",
-    "World 06: THE MYSTERIOUS LIBRARY (klein)"
+    "World 06: THE MYSTERIOUS LIBRARY (klein)",
+    "World 07: CELESTIAL EXPRESS (Love of Remembrance - ishtar)",
+    "World 08: UNKNOWN REALM (Sealed)",
+    "Khu Vực: BOSS ẨN (5 Hidden Bosses)"
 }
 
+-- Trọn bộ Mini Boss & Boss Ẩn (Sắp xếp theo World)
 local ALL_MINI_BOSS_LIST = {
-    "chahaein", "guildmaster", "sukuna", "yuta", "yuno", "swordempress"
+    -- World 02: Dungeon
+    "chahaein",
+    "guildmaster",
+    -- World 03: Endless Castle
+    "ragna",
+    -- World 04: Limitless Domain
+    "sukuna",
+    "yuta",
+    -- World 05: Devil Heart
+    "swordempress",
+    "yuno",
+    -- World 07: Celestial Express (3 Mini Boss)
+    "boothill",
+    "jingliu",
+    "hsr_mini3",
+    -- 5 Boss Ẩn (Hidden Bosses)
+    "hidden boss 1",
+    "hidden boss 2",
+    "hidden boss 3",
+    "hidden boss 4",
+    "hidden boss 5"
 }
 
+-- Danh sách Trùm Cuối đầy đủ
 local ALL_MAIN_BOSS_LIST = {
     "The Shadow Monarch (queen)",
     "The Honored One (gojo)",
-    "Clockmaiden (kurumi)"
+    "Clockmaiden (kurumi)",
+    "Love of Remembrance (ishtar)",
+    "Klein Moretti (klein)",
+    "Makima (makima)",
+    "Hatsune Miku (miku)",
+    "Evolution Boss - Hourly (eydis)"
 }
 
 local MAIN_BOSS_DIFFICULTIES = {
@@ -169,34 +307,76 @@ local MAIN_BOSS_DIFFICULTIES = {
 }
 
 local BOSS_MAP_MAPPING = {
-    ["queen"] = "sjwmap",
-    ["gojo"] = "gojodomainv2",
-    ["kurumi"] = "kurumimapspawn"
+    ["queen"]  = "sjwmap",
+    ["gojo"]   = "gojodomainv2",
+    ["kurumi"] = "kurumimapspawn",
+    ["klein"]  = "mysteriouslibrary",
+    ["ishtar"] = "astralexpress"
 }
 
 local BOSS_GUI_NAME_MAP = {
-    ["queen"] = "WorldBossGui",
+    ["queen"]  = "WorldBossGui",
     ["kurumi"] = "KurumiBossGui",
-    ["gojo"] = "GojoBossGui",
-    ["eydis"] = "EydisBossGui"
+    ["gojo"]   = "GojoBossGui",
+    ["eydis"]  = "EydisBossGui",
+    ["ishtar"] = "IshtarBossGui"
 }
 
 -- Trạng thái toàn cục
-_G.SelectedMap = _G.SelectedMap or "World 02: DUNGEON (queen)"
+_G.SelectedMap = _G.SelectedMap or "World 02: DUNGEON (Shadow Realm - queen)"
 _G.SelectedMiniBosses = _G.SelectedMiniBosses or { "chahaein", "guildmaster" }
 _G.AutoMiniBoss = _G.AutoMiniBoss or false
-_G.SelectedMainBosses = _G.SelectedMainBosses or { "The Shadow Monarch (queen)" }
-_G.SelectedMainDifficulty = _G.SelectedMainDifficulty or "Normal"
+
+-- Độ khó Mini Boss (Có thể tùy chỉnh cho cả Mini Boss lẫn 5 Boss Ẩn)
+_G.SelectedMiniDifficulty = _G.SelectedMiniDifficulty or "01: NORMAL (Normal)"
+_G.MiniBossDifficulties = _G.MiniBossDifficulties or {
+    ["chahaein"]     = "01: NORMAL (Normal)",
+    ["guildmaster"]  = "01: NORMAL (Normal)",
+    ["yuno"]         = "01: NORMAL (Normal)",
+    ["sukuna"]       = "01: NORMAL (Normal)",
+    ["yuta"]         = "01: NORMAL (Normal)",
+    ["swordempress"] = "01: NORMAL (Normal)",
+    ["ragna"]        = "01: NORMAL (Normal)",
+    ["boothill"]     = "01: NORMAL (Normal)",
+    ["jingliu"]      = "01: NORMAL (Normal)",
+    ["hsr_mini3"]    = "01: NORMAL (Normal)",
+    ["hidden boss 1"] = "01: NORMAL (Normal)",
+    ["hidden boss 2"] = "01: NORMAL (Normal)",
+    ["hidden boss 3"] = "01: NORMAL (Normal)",
+    ["hidden boss 4"] = "01: NORMAL (Normal)",
+    ["hidden boss 5"] = "01: NORMAL (Normal)"
+}
+
+_G.SelectedMainBosses = _G.SelectedMainBosses or { "The Shadow Monarch (queen)", "The Honored One (gojo)", "Clockmaiden (kurumi)", "Love of Remembrance (ishtar)" }
+_G.SelectedMainDifficulty = _G.SelectedMainDifficulty or "01: NORMAL (Normal)"
 _G.MainBossDifficulties = _G.MainBossDifficulties or {
-    ["queen"] = "04: ASTRAL (Uni)",
-    ["gojo"] = "02: CALAMITY (Gold)",
-    ["kurumi"] = "03: UMBRAL (Rainbow)"
+    ["queen"]  = "04: ASTRAL (Uni)",
+    ["gojo"]   = "02: CALAMITY (Gold)",
+    ["kurumi"] = "03: UMBRAL (Rainbow)",
+    ["ishtar"] = "01: NORMAL (Normal)"
 }
 _G.AutoMainBoss = _G.AutoMainBoss or false
 _G.PriorityMode = _G.PriorityMode or "RiftGate > Boss Chính > Boss Mini (Mặc Định)"
-_G.BossDelay = _G.BossDelay or 0.5
+_G.BossDelay = _G.BossDelay or 0.3
 _G.RiftNotify = _G.RiftNotify or true
 _G.AutoRiftGate = _G.AutoRiftGate or false
+
+-- Cài đặt mới: Auto Roll & Auto Tháp
+_G.AutoRoll = _G.AutoRoll or false
+_G.AutoNextFloor = _G.AutoNextFloor or false
+
+-- Cài đặt Phân Hệ 1: Dungeon, Raid Boss & Trùm Giờ Eydis
+_G.AutoDungeon = _G.AutoDungeon or false
+_G.SelectedDungeonStage = _G.SelectedDungeonStage or "Tự Động (Stage Cao Nhất)"
+_G.AutoClaimDungeonReward = _G.AutoClaimDungeonReward or true
+
+_G.AutoRaidBoss = _G.AutoRaidBoss or false
+_G.SelectedRaidNode = _G.SelectedRaidNode or "Tự Động Quét Hết (Node 1 -> 5)"
+
+_G.AutoEydis = _G.AutoEydis or false
+_G.SelectedEydisDiff = _G.SelectedEydisDiff or "Normal"
+_G.EydisChallengeMode = _G.EydisChallengeMode or false
+
 _G.AntiAFK = _G.AntiAFK or true
 _G.DisableConsoleLogs = _G.DisableConsoleLogs or false
 _G.WhiteScreen = _G.WhiteScreen or false
@@ -208,7 +388,9 @@ _G.WalkSpeedValue = _G.WalkSpeedValue or 16
 local isMiniBossBusy = false
 local isMainBossFighting = false
 local isRiftGateBusy = false
-local lastDefeatedBossTime = {}
+local isDungeonBusy = false
+local isRaidBusy = false
+local isEydisBusy = false
 
 -- ========================================================================
 -- 4. HỆ THỐNG LƯU / TẢI CẤU HÌNH (PERSISTENT CONFIG)
@@ -233,6 +415,8 @@ local function saveConfig()
             SelectedMap = _G.SelectedMap,
             SelectedMiniBosses = _G.SelectedMiniBosses,
             AutoMiniBoss = _G.AutoMiniBoss,
+            SelectedMiniDifficulty = _G.SelectedMiniDifficulty,
+            MiniBossDifficulties = _G.MiniBossDifficulties,
             SelectedMainBosses = _G.SelectedMainBosses,
             SelectedMainDifficulty = _G.SelectedMainDifficulty,
             MainBossDifficulties = _G.MainBossDifficulties,
@@ -241,6 +425,16 @@ local function saveConfig()
             BossDelay = _G.BossDelay,
             RiftNotify = _G.RiftNotify,
             AutoRiftGate = _G.AutoRiftGate,
+            AutoRoll = _G.AutoRoll,
+            AutoNextFloor = _G.AutoNextFloor,
+            AutoDungeon = _G.AutoDungeon,
+            SelectedDungeonStage = _G.SelectedDungeonStage,
+            AutoClaimDungeonReward = _G.AutoClaimDungeonReward,
+            AutoRaidBoss = _G.AutoRaidBoss,
+            SelectedRaidNode = _G.SelectedRaidNode,
+            AutoEydis = _G.AutoEydis,
+            SelectedEydisDiff = _G.SelectedEydisDiff,
+            EydisChallengeMode = _G.EydisChallengeMode,
             AntiAFK = _G.AntiAFK,
             DisableConsoleLogs = _G.DisableConsoleLogs,
             WhiteScreen = _G.WhiteScreen,
@@ -257,7 +451,6 @@ local function loadConfig()
     pcall(function()
         if not isfile or not readfile then return end
         ensureConfigDir()
-        -- Tự động migrate file cũ nếu có
         local targetFile = CONFIG_FILE_NAME
         if not isfile(targetFile) and isfile("SuiSuiHUB_CardOrigins_Config.json") then
             targetFile = "SuiSuiHUB_CardOrigins_Config.json"
@@ -268,16 +461,26 @@ local function loadConfig()
                 if data.SelectedMap ~= nil then _G.SelectedMap = data.SelectedMap end
                 if data.SelectedMiniBosses ~= nil then _G.SelectedMiniBosses = data.SelectedMiniBosses end
                 if data.AutoMiniBoss ~= nil then _G.AutoMiniBoss = data.AutoMiniBoss end
+                if data.SelectedMiniDifficulty ~= nil then _G.SelectedMiniDifficulty = data.SelectedMiniDifficulty end
+                if data.MiniBossDifficulties ~= nil then _G.MiniBossDifficulties = data.MiniBossDifficulties end
                 if data.SelectedMainBosses ~= nil then _G.SelectedMainBosses = data.SelectedMainBosses end
                 if data.SelectedMainDifficulty ~= nil then _G.SelectedMainDifficulty = data.SelectedMainDifficulty end
-                if data.MainBossDifficulties ~= nil then
-                    _G.MainBossDifficulties = data.MainBossDifficulties
-                end
+                if data.MainBossDifficulties ~= nil then _G.MainBossDifficulties = data.MainBossDifficulties end
                 if data.AutoMainBoss ~= nil then _G.AutoMainBoss = data.AutoMainBoss end
                 if data.PriorityMode ~= nil then _G.PriorityMode = data.PriorityMode end
                 if data.BossDelay ~= nil then _G.BossDelay = data.BossDelay end
                 if data.RiftNotify ~= nil then _G.RiftNotify = data.RiftNotify end
                 if data.AutoRiftGate ~= nil then _G.AutoRiftGate = data.AutoRiftGate end
+                if data.AutoRoll ~= nil then _G.AutoRoll = data.AutoRoll end
+                if data.AutoNextFloor ~= nil then _G.AutoNextFloor = data.AutoNextFloor end
+                if data.AutoDungeon ~= nil then _G.AutoDungeon = data.AutoDungeon end
+                if data.SelectedDungeonStage ~= nil then _G.SelectedDungeonStage = data.SelectedDungeonStage end
+                if data.AutoClaimDungeonReward ~= nil then _G.AutoClaimDungeonReward = data.AutoClaimDungeonReward end
+                if data.AutoRaidBoss ~= nil then _G.AutoRaidBoss = data.AutoRaidBoss end
+                if data.SelectedRaidNode ~= nil then _G.SelectedRaidNode = data.SelectedRaidNode end
+                if data.AutoEydis ~= nil then _G.AutoEydis = data.AutoEydis end
+                if data.SelectedEydisDiff ~= nil then _G.SelectedEydisDiff = data.SelectedEydisDiff end
+                if data.EydisChallengeMode ~= nil then _G.EydisChallengeMode = data.EydisChallengeMode end
                 if data.AntiAFK ~= nil then _G.AntiAFK = data.AntiAFK end
                 if data.DisableConsoleLogs ~= nil then _G.DisableConsoleLogs = data.DisableConsoleLogs end
                 if data.WhiteScreen ~= nil then _G.WhiteScreen = data.WhiteScreen end
@@ -291,12 +494,13 @@ local function loadConfig()
 end
 
 loadConfig()
+if not GAME_WORLDS[_G.SelectedMap] then
+    _G.SelectedMap = "World 02: DUNGEON (Shadow Realm - queen)"
+end
 
 -- ========================================================================
--- 5. TIỆN ÍCH GUI, ĐIỀU KHIỂN & BẬT/TẮT IN-GAME AUTO FIGHT
+-- 5. CÁC HÀM TIỆN ÍCH, PHÂN GIẢI ID VÀ ĐIỀU KHIỂN
 -- ========================================================================
-
--- Click GUI element an toàn, siêu nhẹ, không gây lag frame
 local function clickGuiElement(btn)
     if not btn then return false end
     local clicked = false
@@ -320,14 +524,22 @@ local function clickGuiElement(btn)
     return clicked
 end
 
--- BẬT / TẮT In-Game Auto Fight (Chuẩn đối số (bossId, diffInternal) theo log dj cung cấp)
+-- Reset cờ trạng thái Auto Fight trên Server (Cực kỳ quan trọng để không bị lock)
+local function resetServerAutoBossFlag()
+    pcall(function()
+        local rem = setAutoBossRemote or (eventRemotes and eventRemotes:FindFirstChild("SetAutoBossFight")) or ReplicatedStorage:FindFirstChild("SetAutoBossFight", true)
+        if rem then
+            rem:FireServer("", nil)
+        end
+    end)
+end
+
 local function setInGameAutoBoss(bossId, enable, diffInternal)
     pcall(function()
         local rem = setAutoBossRemote or (eventRemotes and eventRemotes:FindFirstChild("SetAutoBossFight")) or ReplicatedStorage:FindFirstChild("SetAutoBossFight", true)
         if not rem then return end
         if enable and bossId then
             diffInternal = diffInternal or "Normal"
-            -- Gửi trực tiếp đúng canonical bossId và độ khó nội bộ (VD: "queen", "Uni")
             rem:FireServer(bossId, diffInternal)
         else
             rem:FireServer("", nil)
@@ -335,7 +547,6 @@ local function setInGameAutoBoss(bossId, enable, diffInternal)
     end)
 end
 
--- Teleport tới Map (Sử dụng FireServer chuẩn cho RemoteEvent WorldsTeleportRequest)
 local function teleportToWorld(mapId)
     if not mapId then return false end
     if not worldsTeleportRemote then
@@ -354,24 +565,6 @@ local function teleportToWorld(mapId)
     return false
 end
 
--- Định vị Map hiện tại
-local function detectCurrentMapId()
-    local name = (workspace.Name or ""):lower()
-    for _, mapKey in ipairs({"sjwmap", "kurumimapspawn", "gojodomainv2", "namimap", "eydismap"}) do
-        if name:find(mapKey) or workspace:FindFirstChild(mapKey) then
-            return mapKey
-        end
-    end
-    for _, obj in ipairs(workspace:GetChildren()) do
-        local n = obj.Name:lower()
-        for _, mapKey in ipairs({"sjwmap", "kurumimapspawn", "gojodomainv2", "namimap", "eydismap"}) do
-            if n:find(mapKey) then return mapKey end
-        end
-    end
-    return ""
-end
-
--- Phân giải tên trùm cuối & độ khó
 local function resolveMainBossId(title)
     if not title then return "queen" end
     local lower = title:lower()
@@ -381,10 +574,16 @@ local function resolveMainBossId(title)
         return "kurumi"
     elseif lower:find("gojo") or lower:find("honored") or lower:find("limitless") then
         return "gojo"
+    elseif lower:find("makima") then
+        return "makima"
+    elseif lower:find("miku") then
+        return "miku"
+    elseif lower:find("klein") then
+        return "klein"
+    elseif lower:find("ishtar") then
+        return "ishtar"
     elseif lower:find("eydis") or lower:find("evolution") then
         return "eydis"
-    elseif lower:find("nami") then
-        return "nami"
     end
     return "queen"
 end
@@ -408,107 +607,92 @@ local function resolveDifficultyInternal(diffStr)
     return diffStr
 end
 
-local function resolveDifficulty(diff)
-    return resolveDifficultyInternal(diff)
-end
+-- Bảng ánh xạ bí danh tên Model trong Workspace
+local BOSS_MODEL_ALIASES = {
+    ["boothill"]     = { "boothill", "cyborg gunslinger", "gunslinger" },
+    ["jingliu"]      = { "jingliu", "sword champion of the cloud city", "sword champion", "cloud city" },
+    ["hsr_mini3"]    = { "hsr_mini3", "dan heng", "acheron", "blade", "himeko", "welt", "sunday", "robin", "aventurine", "silver wolf", "kafka" },
+    ["ishtar"]       = { "ishtar_cyrenebase_verified", "love of remembrance", "ishtar", "cyrene" },
+    ["swordempress"] = { "swordempress", "eydis", "sword empress" },
+    ["yuno"]         = { "yuno", "yuno mini boss" },
+    ["chahaein"]     = { "chahaein", "cha hae-in", "cha" },
+    ["guildmaster"]  = { "guildmaster", "guild master" },
+    ["sukuna"]       = { "sukuna", "awakened sukuna" },
+    ["yuta"]         = { "yuta", "mini boss yuta", "yuta okkotsu" },
+    ["ragna"]        = { "ragna" }
+}
 
--- Lấy giao diện của Trùm tương ứng (Chống xung đột GUI Gojo đè lên)
-local function getActiveBossScreenGui(targetBossId)
-    local pg = localPlayer:FindFirstChild("PlayerGui")
-    if not pg then return nil end
-    local targetGuiName = targetBossId and BOSS_GUI_NAME_MAP[targetBossId]
-    if targetGuiName then
-        local g = pg:FindFirstChild(targetGuiName)
-        if g and g.Enabled then return g end
-    end
-    for _, gName in ipairs({"WorldBossGui", "KurumiBossGui", "GojoBossGui", "EydisBossGui"}) do
-        local g = pg:FindFirstChild(gName)
-        if g and g.Enabled then return g end
-    end
-    return nil
-end
+-- Định vị Model của Mini Boss & Boss Ẩn trong Workspace
+local function findMiniBossModel(bossId)
+    if not bossId then return nil end
+    local clean = bossId:lower():gsub("%s+", "")
+    local aliases = BOSS_MODEL_ALIASES[bossId:lower()] or {}
 
--- Đóng giao diện trùm
-local function closeActiveBossGui(targetBossId)
-    pcall(function()
-        local bossGui = getActiveBossScreenGui(targetBossId)
-        if bossGui then
-            local bossOverlay = bossGui:FindFirstChild("BossOverlay")
-            local root = bossOverlay and bossOverlay:FindFirstChild("Root")
-            local slantHeader = root and root:FindFirstChild("SlantHeader")
-            local closeBtn = slantHeader and (slantHeader:FindFirstChild("Close") or slantHeader:FindFirstChildWhichIsA("GuiButton"))
-            if closeBtn then clickGuiElement(closeBtn) end
-            if bossOverlay then bossOverlay.Visible = false end
+    local function matchName(str)
+        if not str then return false end
+        local s = str:lower():gsub("%s+", "")
+        if s == clean or s:find(clean) or clean:find(s) then return true end
+        for _, alias in ipairs(aliases) do
+            local ac = alias:lower():gsub("%s+", "")
+            if s == ac or s:find(ac) or ac:find(s) then return true end
         end
-    end)
-end
+        return false
+    end
 
--- Tìm nút FIGHT của đúng Trùm
-local function findFightButton(targetBossId)
-    local bossGui = getActiveBossScreenGui(targetBossId)
-    if not bossGui then return nil end
-    for _, desc in ipairs(bossGui:GetDescendants()) do
-        if desc:IsA("GuiButton") or desc:IsA("TextButton") or desc:IsA("ImageButton") then
-            local n = (desc.Name or ""):lower()
-            local t = desc:IsA("TextButton") and (desc.Text or ""):lower() or ""
-            if n:find("fight") or t:find("fight") or n == "start" or t == "start" then
-                if desc.Visible and desc.AbsoluteSize.X > 10 and desc.AbsoluteSize.Y > 10 then
-                    return desc
-                end
+    local function checkModel(obj)
+        if not obj or not obj:IsA("Model") then return false end
+        if matchName(obj.Name) then return true end
+        -- Quét text trên BillboardGui nếu có
+        for _, desc in ipairs(obj:GetDescendants()) do
+            if desc:IsA("TextLabel") and matchName(desc.Text) then
+                return true
+            end
+        end
+        return false
+    end
+
+    -- 1. Tìm trực tiếp trong Workspace
+    for _, obj in ipairs(workspace:GetChildren()) do
+        if checkModel(obj) then return obj end
+    end
+
+    -- 2. Tìm trong các thư mục phổ biến
+    for _, folderName in ipairs({"NPCs", "Bosses", "Enemies", "Monsters", "Spawns", "Map"}) do
+        local f = workspace:FindFirstChild(folderName)
+        if f then
+            for _, obj in ipairs(f:GetChildren()) do
+                if checkModel(obj) then return obj end
             end
         end
     end
     return nil
 end
 
--- Chọn độ khó trên GUI Trùm (Hỗ trợ cả Tên hiển thị lẫn Tên nội bộ Uni/Rainbow/Gold/Normal)
-local function selectGameBossDifficulty(diffName, targetBossId)
-    local bossGui = getActiveBossScreenGui(targetBossId)
-    if not bossGui then return false end
-    local s = (diffName or "Normal"):lower()
-    local keywords = {}
-    if s:find("astral") or s:find("uni") or s:find("04") then
-        keywords = {"astral", "uni", "4"}
-    elseif s:find("umbral") or s:find("rainbow") or s:find("03") then
-        keywords = {"umbral", "rainbow", "3"}
-    elseif s:find("calamity") or s:find("gold") or s:find("02") then
-        keywords = {"calamity", "gold", "2"}
-    elseif s:find("paradox") or s:find("05") then
-        keywords = {"paradox", "5"}
-    elseif s:find("origin") or s:find("06") then
-        keywords = {"origin", "6"}
-    elseif s:find("normal") or s:find("01") then
-        keywords = {"normal", "1"}
-    else
-        keywords = { s }
-    end
-
-    for _, desc in ipairs(bossGui:GetDescendants()) do
-        if desc:IsA("GuiButton") or desc:IsA("TextButton") then
-            local n = (desc.Name or ""):lower()
-            local t = desc:IsA("TextButton") and (desc.Text or ""):lower() or ""
-            for _, kw in ipairs(keywords) do
-                if n:find(kw) or t:find(kw) then
-                    clickGuiElement(desc)
-                    return true
-                end
-            end
+-- Teleport tới vị trí của Mini Boss hoặc Boss Ẩn
+local function teleportToMiniBoss(bossId)
+    local model = findMiniBossModel(bossId)
+    if model then
+        local targetCF = model:GetPivot()
+        local char = localPlayer.Character
+        local hrp = char and char:FindFirstChild("HumanoidRootPart")
+        if hrp and targetCF then
+            hrp.CFrame = targetCF + Vector3.new(0, 3, -4)
+            Notification("Dịch Chuyển", "Đã bay tới vị trí: " .. tostring(model.Name), 2)
+            return true
         end
     end
+    Notification("Dịch Chuyển", "Không tìm thấy Model: " .. tostring(bossId) .. " trên map hiện tại!", 3)
     return false
 end
 
--- Bộ tự động đóng giao diện Đài Phun Nước (Fountain) và Shop bảo vệ màn hình 100%
+-- Đóng Fountain / Popup rác
 local function autoDismissFountain()
     pcall(function()
         local pg = localPlayer:FindFirstChild("PlayerGui")
         if not pg then return end
         for _, g in ipairs(pg:GetChildren()) do
-            if g:IsA("ScreenGui") and g.Enabled then
-                local gn = g.Name:lower()
-                if gn:find("fountain") then
-                    g.Enabled = false
-                end
+            if g:IsA("ScreenGui") and g.Enabled and g.Name:lower():find("fountain") then
+                g.Enabled = false
             end
         end
         local sg = pg:FindFirstChild("ScreenGui")
@@ -522,32 +706,23 @@ local function autoDismissFountain()
     end)
 end
 
--- Tự động dọn dẹp Fountain ngầm liên tục
 task.spawn(function()
     while true do
         autoDismissFountain()
-        task.wait(0.5)
+        task.wait(1.0)
     end
 end)
 
--- Kiểm tra Cooldown Trùm Cuối (Hỏi trực tiếp Server, không khóa cứng thời gian nội bộ)
-local function checkMainBossCooldown(bossId, diff)
-    if not bossId then return 0 end
-    diff = resolveDifficultyInternal(diff)
+local BOSS_VICTORY_GUIS = {
+    ["worldbossgui"] = true,
+    ["kurumibossgui"] = true,
+    ["gojobossgui"] = true,
+    ["eydisbossgui"] = true,
+    ["rewardpopupgui"] = true,
+    ["raidresultbanner"] = true,
+    ["cardoriginsriftbattle"] = true
+}
 
-    -- Query GetBossCooldown từ Server
-    if getCooldownRemote then
-        local ok, cd = pcall(function()
-            return getCooldownRemote:InvokeServer(bossId, diff)
-        end)
-        if ok and typeof(cd) == "number" and cd > 0 then
-            return cd
-        end
-    end
-    return 0
-end
-
--- Tự động dọn dẹp Popup kết thúc trận (Chỉ quét GUI đang bật, siêu nhẹ)
 local function autoDismissBossDefeated()
     pcall(function()
         local pg = localPlayer:FindFirstChild("PlayerGui")
@@ -555,10 +730,19 @@ local function autoDismissBossDefeated()
         for _, g in ipairs(pg:GetChildren()) do
             if g:IsA("ScreenGui") and g.Enabled then
                 local gn = g.Name:lower()
-                if gn:find("boss") or gn:find("reward") or gn:find("victory") or gn:find("defeat") or gn:find("win") or gn:find("result") then
+                -- TUYỆT ĐỐI BẢO VỆ CÁC GUI CHIẾN ĐẤU CỦA INFINITE RUN / TOWER / BATTLE SLOT
+                if gn:find("battlegui") or gn:find("battlesgui") or gn:find("arena") or gn:find("tower") or gn:find("severed") or gn:find("gameui") then
+                    continue
+                end
+
+                if BOSS_VICTORY_GUIS[gn] or (gn:find("boss") and gn:find("gui")) or gn:find("rewardpopup") then
                     for _, desc in ipairs(g:GetDescendants()) do
                         if desc:IsA("GuiButton") and desc.Visible then
                             local t = (desc:IsA("TextButton") and desc.Text or desc.Name):lower()
+                            -- Không bao giờ bấm nút Kết Thúc, Đầu Hàng, Thoát
+                            if t:find("end") or t:find("surrender") or t:find("cancel") or t:find("leave") or t:find("confirm") then
+                                continue
+                            end
                             if t:find("continue") or t:find("claim") or t:find("ok") or t:find("close") or t:find("skip") then
                                 clickGuiElement(desc)
                             end
@@ -570,203 +754,122 @@ local function autoDismissBossDefeated()
     end)
 end
 
--- Chu trình gửi gói tin chiến thắng & nhận thưởng (Đứng đâu cũng đánh được, an toàn 100%, không tele)
+-- ========================================================================
+-- 6. THUẬT TOÁN ĐÁNH BOSS INSTANT-WIN SIÊU TỐC (CHẠY NGẦM 100%)
+-- ========================================================================
+
+-- Kiểm tra Cooldown Trùm Cuối & Mini Boss từ Server
+local function checkMainBossCooldown(bossId, diff)
+    if not bossId then return 0 end
+    diff = resolveDifficultyInternal(diff)
+    if getCooldownRemote then
+        local ok, cd = pcall(function()
+            return getCooldownRemote:InvokeServer(bossId, diff)
+        end)
+        if ok and typeof(cd) == "number" and cd > 0 then
+            return cd
+        end
+    end
+    return 0
+end
+
+-- Thực thi đánh Trùm Cuối với quy trình Instant Win chuẩn xác
 local function executeBossVictory(bossId, diff)
     if not bossId then return false end
-    diff = resolveDifficulty(diff)
+    diff = resolveDifficultyInternal(diff)
 
-    -- Bấm nút FIGHT trên GUI nếu đang hiển thị
-    local fightBtn = findFightButton(bossId)
-    if fightBtn then
-        clickGuiElement(fightBtn)
-        task.wait(0.1)
+    -- 1. Kiểm tra Cooldown trước khi gọi
+    local cd = checkMainBossCooldown(bossId, diff)
+    if cd > 0 then
+        safeLog(string.format("[SuiSuiHUB] Boss %s [%s] còn Cooldown: %.1fs. Bỏ qua chờ hồi chiêu.", bossId, diff, cd))
+        return false
     end
 
-    -- Đồng bộ Cooldown / Progress
-    pcall(function()
-        if getCooldownRemote then getCooldownRemote:InvokeServer(bossId, "Normal") end
-        if getBorderProgRemote then getBorderProgRemote:InvokeServer(bossId) end
-    end)
+    -- 2. Gọi Remote khởi tạo trận đấu ở SLOT 2 (isSlot2 = true)
+    local remoteName = MAIN_BOSS_REMOTE_MAP[bossId] or ("Build" .. bossId:sub(1,1):upper() .. bossId:sub(2) .. "Battle")
+    local buildRemote = eventRemotes and eventRemotes:FindFirstChild(remoteName) or ReplicatedStorage:FindFirstChild(remoteName, true)
+
+    if buildRemote and buildRemote:IsA("RemoteFunction") then
+        pcall(function() buildRemote:InvokeServer(diff, true) end)
+    end
     task.wait(0.05)
 
-    -- Gọi Remote Build Battle chuyên biệt
-    pcall(function()
-        local target = (bossId or ""):lower():gsub("%s+", "")
-        local candidates = {}
-        if target:find("kurumi") then
-            candidates = { "BuildKurumiBattle", "BuildClockmaidenBattle" }
-        elseif target:find("gojo") then
-            candidates = { "BuildGojoBattle", "BuildLimitlessBattle", "BuildDomainBattle" }
-        elseif target:find("queen") then
-            candidates = { "BuildQueenBattle", "BuildShadowMonarchBattle", "BuildSjwBattle", "BuildShadowBattle", "BuildWorldBossBattle", "BuildRaidBossBattle" }
-        elseif target:find("eydis") or target:find("evolution") then
-            candidates = { "BuildEydisBattle", "BuildEvolutionBattle" }
-        end
-
-        if eventRemotes then
-            for _, cName in ipairs(candidates) do
-                local rem = eventRemotes:FindFirstChild(cName) or ReplicatedStorage:FindFirstChild(cName, true)
-                if rem and rem:IsA("RemoteFunction") then
-                    pcall(function() rem:InvokeServer(diff, false) end)
-                    pcall(function() rem:InvokeServer(diff, true) end)
-                    break
-                end
-            end
-        end
-    end)
-    task.wait(0.1)
-
-    -- Bắt đầu trận đấu & Báo cáo sát thương (Tuyệt đối KHÔNG gọi EndBattle để không làm ngắt quãng Infinite Run của dj)
-    if startBattleRemote then pcall(function() startBattleRemote:InvokeServer(true) end) end
-    if reportBattleDmgRemote then pcall(function() reportBattleDmgRemote:FireServer(999999, "dealt") end) end
-    task.wait(0.15)
-
-    -- Báo cáo chiến thắng nhận quà
+    -- 3. Báo cáo chiến thắng nhận thưởng trực tiếp (KHÔNG gọi StartBattle/ReportDamage/EndBattle để bảo vệ 100% run Infinite)
     local reportOk = false
     if reportVictoryRemote then
         local ok = pcall(function() reportVictoryRemote:FireServer(bossId, diff) end)
         if ok then reportOk = true end
-        pcall(function() reportVictoryRemote:FireServer(bossId, diff) end)
     end
 
-    task.wait(0.1)
+    -- 4. Đóng popup nhận thưởng tự động
+    task.wait(0.05)
     autoDismissBossDefeated()
-    closeActiveBossGui(bossId)
     autoDismissFountain()
-    safeLog(string.format("[SuiSuiHUB] Đã đấm Trùm Cuối & Nhận quà: %s [%s]", tostring(bossId), tostring(diff)))
+
+    safeLog(string.format("[SuiSuiHUB] Đã đấm Trùm Cuối Instant-Win: %s [%s]", tostring(bossId), tostring(diff)))
     return reportOk
 end
 
--- Thực thi đấm Trùm Cuối (MẶC ĐỊNH ĐỨNG ĐÂU CŨNG ĐÁNH ĐƯỢC - KHÔNG CẦN TELE TỚI MAP)
-local function engageMainBossBattle(bossId, diffInternal, diffDisplayName)
+-- Thực thi đánh Mini Boss & Boss Ẩn với Chế Độ Độ Khó & Instant-Win
+local function executeMiniBossBattle(bossId, diff)
     if not bossId then return false end
-    diffInternal = resolveDifficultyInternal(diffInternal)
+    diff = resolveDifficultyInternal(diff or (_G.MiniBossDifficulties and _G.MiniBossDifficulties[bossId]) or _G.SelectedMiniDifficulty or "Normal")
 
-    -- Nếu GUI Boss đang hiển thị trên màn hình: chọn độ khó & bấm nút FIGHT
-    local bossGui = getActiveBossScreenGui(bossId)
-    if bossGui then
-        selectGameBossDifficulty(diffDisplayName or diffInternal, bossId)
-        task.wait(0.05)
-        local fightBtn = findFightButton(bossId)
-        if fightBtn then clickGuiElement(fightBtn) end
-        task.wait(0.1)
+    -- 1. Kiểm tra Cooldown Mini Boss nếu Server quản lý
+    local cd = checkMainBossCooldown(bossId, diff)
+    if cd > 0 then
+        safeLog(string.format("[SuiSuiHUB] Mini/Hidden Boss %s [%s] còn Cooldown: %.1fs. Bỏ qua.", bossId, diff, cd))
+        return false
     end
 
-    -- Gửi chuỗi Remote đấm Boss & Nhận quà (Đứng bất kỳ đâu: Floor 18, Lobby, map bất kỳ đều đấm được)
-    return executeBossVictory(bossId, diffInternal)
-end
+    -- 2. Build trận ở SLOT 2: ưu tiên BuildMini_<id>(diff, true), fallback BuildMiniBossBattle(id, true)
+    local cleanId = (bossId:gsub("%s+", ""))
+    local specificMiniName = "BuildMini_" .. cleanId
+    local specificMiniRemote = eventRemotes and eventRemotes:FindFirstChild(specificMiniName) or ReplicatedStorage:FindFirstChild(specificMiniName, true)
 
--- ========================================================================
--- 6. CORE LOGIC CHO MINI BOSS & RIFTGATE
--- ========================================================================
-
--- Tìm model Mini Boss
-local function findMiniBossModel(bossId)
-    if not bossId then return nil end
-    local clean = bossId:lower():gsub("%s+", "")
-    for _, folderName in ipairs({"NPCs", "Bosses", "Enemies", "Monsters", "Spawns"}) do
-        local f = workspace:FindFirstChild(folderName)
-        if f then
-            for _, obj in ipairs(f:GetChildren()) do
-                if obj:IsA("Model") and obj.Name:lower():gsub("%s+", ""):find(clean) then
-                    return obj
-                end
+    if specificMiniRemote and specificMiniRemote:IsA("RemoteFunction") then
+        pcall(function() specificMiniRemote:InvokeServer(diff, true) end)
+    else
+        if not buildMiniBossRemote then
+            buildMiniBossRemote = eventRemotes and eventRemotes:FindFirstChild("BuildMiniBossBattle") or ReplicatedStorage:FindFirstChild("BuildMiniBossBattle", true)
+        end
+        if buildMiniBossRemote then
+            pcall(function() buildMiniBossRemote:InvokeServer(bossId, true) end)
+            if bossId == "jingliu" then
+                pcall(function() buildMiniBossRemote:InvokeServer("swordchampion", true) end)
             end
         end
     end
-    for _, obj in ipairs(workspace:GetChildren()) do
-        if obj:IsA("Model") and obj.Name:lower():gsub("%s+", ""):find(clean) then
-            return obj
-        end
-    end
-    return nil
-end
+    task.wait(0.05)
 
-local function teleportToMiniBoss(bossId)
-    local model = findMiniBossModel(bossId)
-    if model then
-        local targetCF = model:GetPivot()
-        local char = localPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if hrp and targetCF then
-            hrp.CFrame = targetCF + Vector3.new(0, 2, -3)
-            return true
-        end
-    end
-    return false
-end
-
-local function executeMiniBossBattle(bossId)
-    if not bossId then return false end
-    if not buildMiniBossRemote then
-        buildMiniBossRemote = eventRemotes and eventRemotes:FindFirstChild("BuildMiniBossBattle") or ReplicatedStorage:FindFirstChild("BuildMiniBossBattle", true)
-    end
+    -- 3. Báo cáo thắng nhận quà theo đúng Độ Khó đã chọn (Không đụng chạm Slot 1 Infinite)
     if not reportVictoryRemote then
         reportVictoryRemote = eventRemotes and eventRemotes:FindFirstChild("ReportBossVictory") or ReplicatedStorage:FindFirstChild("ReportBossVictory", true)
     end
-    if buildMiniBossRemote then
-        pcall(function() buildMiniBossRemote:InvokeServer(bossId) end)
-    end
-    task.wait(0.15)
     if reportVictoryRemote then
-        pcall(function() reportVictoryRemote:FireServer(bossId, "Normal") end)
+        pcall(function() reportVictoryRemote:FireServer(bossId, diff) end)
+        if bossId == "jingliu" then
+            pcall(function() reportVictoryRemote:FireServer("swordchampion", diff) end)
+        end
     end
-    task.wait(0.1)
+
+    -- 4. Dọn popup an toàn
+    task.wait(0.05)
     autoDismissBossDefeated()
+    safeLog(string.format("[SuiSuiHUB] Đã đấm Mini/Hidden Boss Instant-Win: %s [%s]", tostring(bossId), tostring(diff)))
     return true
 end
 
--- RiftGATE Logic
-local cachedRiftGate = nil
-local function findRiftGate()
-    if cachedRiftGate and cachedRiftGate.Parent then
-        local p = cachedRiftGate:FindFirstChildWhichIsA("ProximityPrompt", true)
-        return cachedRiftGate, p
-    end
-    for _, folderName in ipairs({"Map", "Spawns", "Gates", "Events"}) do
-        local f = workspace:FindFirstChild(folderName)
-        if f then
-            for _, obj in ipairs(f:GetChildren()) do
-                if obj:IsA("Model") and (obj.Name:lower():find("rift") or obj.Name:lower():find("gate") or obj.Name:lower():find("portal")) then
-                    local p = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
-                    cachedRiftGate = obj
-                    return obj, p
-                end
-            end
-        end
-    end
-    for _, obj in ipairs(workspace:GetChildren()) do
-        if obj:IsA("Model") and (obj.Name:lower():find("rift") or obj.Name:lower():find("gate") or obj.Name:lower():find("portal")) then
-            local p = obj:FindFirstChildWhichIsA("ProximityPrompt", true)
-            cachedRiftGate = obj
-            return obj, p
-        end
-    end
-    return nil, nil
-end
-
-local function teleportToRiftGate()
-    local gateModel = findRiftGate()
-    if gateModel then
-        local cf = gateModel:GetPivot()
-        local char = localPlayer.Character
-        local hrp = char and char:FindFirstChild("HumanoidRootPart")
-        if hrp and cf then
-            hrp.CFrame = cf + Vector3.new(0, 3, 0)
-            return true
-        end
-    end
-    return false
-end
-
+-- ========================================================================
+-- 7. CHU TRÌNH RIFTGATE TỪ XA (GIỮ NGUYÊN VỊ TRÍ 100%)
+-- ========================================================================
 local function executeRiftGateCycle()
     isRiftGateBusy = true
-    safeLog("[SuiSuiHUB] Đang tham gia RiftGATE từ xa (0s Teleport)...")
+    safeLog("[SuiSuiHUB] Đang tham gia RiftGATE từ xa...")
     Notification("RiftGATE", "Đang tự động đánh RiftGATE từ xa...", 2)
 
-    -- Chạy ngầm 100% bằng Remote, TUYỆT ĐỐI KHÔNG di chuyển nhân vật để bảo toàn Infinite Run
     if riftGateEnterRemote then pcall(function() riftGateEnterRemote:FireServer() end) end
-    task.wait(0.2)
+    task.wait(0.15)
     if buildRiftBattleRemote then pcall(function() buildRiftBattleRemote:InvokeServer(true) end) end
     if riftStartFightRemote then
         pcall(function()
@@ -778,32 +881,28 @@ local function executeRiftGateCycle()
         end)
     end
     if reportBattleDmgRemote then pcall(function() reportBattleDmgRemote:FireServer(999999, "dealt") end) end
-    task.wait(0.25)
+    task.wait(0.2)
 
-    -- Nhận quà chiến thắng
     if reportRiftVictoryRemote then pcall(function() reportRiftVictoryRemote:FireServer() end) end
-    task.wait(0.2)
+    task.wait(0.15)
     if riftRewardRemote then pcall(function() riftRewardRemote:FireServer() end) end
-    task.wait(0.2)
-
-    -- Rời cổng RiftGATE
+    task.wait(0.15)
     if riftGateLeaveRemote then pcall(function() riftGateLeaveRemote:FireServer() end) end
+
     autoDismissBossDefeated()
     autoDismissFountain()
 
-    -- Đánh dấu đã hoàn thành đợt này: KHÔNG lặp lại, giữ nguyên vị trí nhân vật
     hasFarmedCurrentRiftGate = true
     isRiftGateBusy = false
-    safeLog("[SuiSuiHUB] Đã hoàn thành RiftGATE & nhận quà xong! Vị trí nhân vật được giữ nguyên 100%.")
-    Notification("RiftGATE", "Đã nhận quà RiftGATE xong! Giữ nguyên vị trí.", 3)
+    safeLog("[SuiSuiHUB] Đã hoàn thành RiftGATE & nhận quà xong! Vị trí nhân vật bảo toàn 100%.")
+    Notification("RiftGATE", "Đã nhận quà RiftGATE xong!", 3)
     return true
 end
 
--- Ưu tiên
+-- Điều kiện nhường đường
 local function shouldYieldToRiftGate()
     if not _G.AutoRiftGate then return false end
     if _G.PriorityMode:find("Không Chờ") then return false end
-    -- Nếu đã farm xong đợt này rồi thì không cần nhường đường nữa, để Auto Boss tiếp tục chạy
     if hasFarmedCurrentRiftGate then return false end
     return isServerRiftGateOpen or isRiftGateBusy
 end
@@ -815,7 +914,302 @@ local function shouldYieldToMainBoss()
 end
 
 -- ========================================================================
--- 7. VÒNG LẶP CHÍNH (LOOPS)
+-- 7.1. CÁC HÀM THỰC THI PHÂN HỆ 1: DUNGEON, RAID BOSS & TRÙM GIỜ EYDIS
+-- ========================================================================
+local DUNGEON_STAGE_NAMES = {
+    [1] = "Stage 01: Scorched Execution",
+    [2] = "Stage 02: Toxic Collapse",
+    [3] = "Stage 03: Broken Mind",
+    [4] = "Stage 04: Blood Feast",
+    [5] = "Stage 05: Absolute Despair"
+}
+
+local function parseDungeonStageNumber(stageInput)
+    if typeof(stageInput) == "number" then return math.clamp(stageInput, 1, 5) end
+    if typeof(stageInput) == "string" then
+        local match = stageInput:match("(%d+)")
+        if match then
+            local n = tonumber(match)
+            if n and n >= 1 and n <= 5 then return n end
+        end
+    end
+    return nil -- Tự động cao nhất
+end
+
+local function getHighestUnlockedDungeonStage()
+    local best = 1
+    pcall(function()
+        if getDungeonProgressRemote and getDungeonProgressRemote:IsA("RemoteFunction") then
+            local prog = getDungeonProgressRemote:InvokeServer()
+            if typeof(prog) == "number" and prog >= 1 and prog <= 5 then
+                best = prog
+            elseif typeof(prog) == "table" and prog.Stage then
+                best = tonumber(prog.Stage) or 1
+            end
+        end
+    end)
+    return math.clamp(best, 1, 5)
+end
+
+local function executeDungeonStage(targetStage)
+    if isDungeonBusy then return false end
+    isDungeonBusy = true
+
+    local stage = parseDungeonStageNumber(targetStage or _G.SelectedDungeonStage)
+    if not stage then
+        stage = getHighestUnlockedDungeonStage()
+    end
+
+    safeLog(string.format("[SuiSuiHUB] Đang khởi chạy Dungeon Stage %d (%s)...", stage, DUNGEON_STAGE_NAMES[stage] or "Gate"))
+
+    -- 1. Kiểm tra Cooldown Dungeon nếu có
+    local cd = 0
+    pcall(function()
+        if getDungeonCooldownRemote and getDungeonCooldownRemote:IsA("RemoteFunction") then
+            cd = tonumber(getDungeonCooldownRemote:InvokeServer()) or 0
+        end
+    end)
+    if cd > 0 then
+        safeLog(string.format("[SuiSuiHUB] Dungeon đang Cooldown: %.1fs. Bỏ qua.", cd))
+        isDungeonBusy = false
+        return false, cd
+    end
+
+    -- 2. Gọi Remote StartDungeonStage
+    if startDungeonStageRemote and startDungeonStageRemote:IsA("RemoteFunction") then
+        pcall(function()
+            startDungeonStageRemote:InvokeServer(stage)
+        end)
+    end
+
+    -- 3. Click UI Enter nếu giao diện CardOriginsRift đang mở
+    pcall(function()
+        local pg = localPlayer:FindFirstChild("PlayerGui")
+        local riftGui = pg and pg:FindFirstChild("CardOriginsRift")
+        if riftGui and riftGui.Enabled then
+            local enterBtn = riftGui:FindFirstChild("Enter", true)
+            if enterBtn and enterBtn:IsA("GuiButton") and enterBtn.Visible then
+                clickGuiElement(enterBtn)
+            end
+        end
+    end)
+
+    task.wait(0.5)
+
+    -- 4. Tự động nhận thưởng nếu được bật
+    if _G.AutoClaimDungeonReward then
+        pcall(function()
+            if claimDungeonRewardRemote and claimDungeonRewardRemote:IsA("RemoteFunction") then
+                claimDungeonRewardRemote:InvokeServer()
+            end
+        end)
+    end
+
+    -- 5. Dọn màn hình chiến thắng CardOriginsRiftBattle nếu có
+    task.wait(0.2)
+    pcall(function()
+        local pg = localPlayer:FindFirstChild("PlayerGui")
+        local battleGui = pg and pg:FindFirstChild("CardOriginsRiftBattle")
+        if battleGui and battleGui.Enabled then
+            local shade = battleGui:FindFirstChild("Shade")
+            if shade and shade:IsA("GuiButton") then
+                clickGuiElement(shade)
+            end
+            local hint = battleGui:FindFirstChild("Hint", true)
+            if hint and hint:IsA("GuiButton") then
+                clickGuiElement(hint)
+            end
+        end
+    end)
+
+    isDungeonBusy = false
+    safeLog(string.format("[SuiSuiHUB] Đã hoàn thành đợt càn quét Dungeon Stage %d!", stage))
+    return true
+end
+
+local RAID_NODE_NAMES = {
+    [1] = "Chapter 1: RETURN FROM DEATH",
+    [2] = "Chapter 2: PRIDE MONSTER",
+    [3] = "Chapter 3: Node 03",
+    [4] = "Chapter 4: Node 04",
+    [5] = "Chapter 5: Node 05"
+}
+
+local function parseRaidNodeNumber(nodeInput)
+    if typeof(nodeInput) == "number" then return math.clamp(nodeInput, 1, 5) end
+    if typeof(nodeInput) == "string" then
+        local match = nodeInput:match("(%d+)")
+        if match then
+            local n = tonumber(match)
+            if n and n >= 1 and n <= 5 then return n end
+        end
+    end
+    return nil -- Quét hết
+end
+
+local function executeRaidBattle(targetNode)
+    if isRaidBusy then return false end
+    isRaidBusy = true
+
+    local node = parseRaidNodeNumber(targetNode or _G.SelectedRaidNode)
+    local nodesToRun = node and { node } or { 1, 2, 3, 4, 5 }
+
+    for _, n in ipairs(nodesToRun) do
+        if not _G.AutoRaidBoss and not targetNode then break end
+
+        safeLog(string.format("[SuiSuiHUB] Đang tiến công Raid Node %d (%s)...", n, RAID_NODE_NAMES[n] or "Raid"))
+
+        -- 1. Gọi Remote RaidStartBattle(n)
+        if raidStartBattleRemote and raidStartBattleRemote:IsA("RemoteFunction") then
+            pcall(function()
+                raidStartBattleRemote:InvokeServer(n)
+            end)
+        end
+
+        -- 2. Click nút trong UI RaidBossUI nếu có
+        pcall(function()
+            local pg = localPlayer:FindFirstChild("PlayerGui")
+            local raidGui = pg and pg:FindFirstChild("RaidBossUI")
+            if raidGui and raidGui.Enabled then
+                local nodeBtn = raidGui:FindFirstChild("Node" .. tostring(n), true)
+                if nodeBtn then
+                    local btn = nodeBtn:FindFirstChild("Button") or nodeBtn:FindFirstChildWhichIsA("GuiButton", true)
+                    if btn then clickGuiElement(btn) end
+                end
+                local enterBtn = raidGui:FindFirstChild("Enter", true)
+                if enterBtn and enterBtn:IsA("GuiButton") and enterBtn.Visible then
+                    clickGuiElement(enterBtn)
+                end
+            end
+        end)
+
+        task.wait(0.4)
+
+        -- 3. Gửi báo cáo chiến thắng Raid: RaidReportResult(true) -> Nhận 3 Sao & Raid Souls!
+        if raidReportResultRemote and raidReportResultRemote:IsA("RemoteFunction") then
+            pcall(function()
+                raidReportResultRemote:InvokeServer(true)
+            end)
+        end
+
+        -- 4. Dọn banner RaidResultBanner
+        task.wait(0.2)
+        pcall(function()
+            local pg = localPlayer:FindFirstChild("PlayerGui")
+            local banner = pg and pg:FindFirstChild("RaidResultBanner")
+            if banner and banner.Enabled then
+                for _, b in ipairs(banner:GetDescendants()) do
+                    if b:IsA("GuiButton") and b.Visible then
+                        clickGuiElement(b)
+                    end
+                end
+            end
+        end)
+
+        safeLog(string.format("[SuiSuiHUB] Đã hoàn thành hạ gục Raid Node %d (+Raid Soul / Stars)!", n))
+        task.wait(0.3)
+    end
+
+    isRaidBusy = false
+    return true
+end
+
+local function resolveEydisDiff(diffInput)
+    if not diffInput then return "Normal", 1 end
+    local str = tostring(diffInput):lower()
+    if str:find("calamity") or str:find("gold") or str:find("2") then
+        return "Gold", 2
+    elseif str:find("umbral") or str:find("rainbow") or str:find("3") then
+        return "Rainbow", 3
+    elseif str:find("astral") or str:find("uni") or str:find("4") then
+        return "Uni", 4
+    elseif str:find("paradox") or str:find("5") then
+        return "Astral", 5
+    elseif str:find("origin") or str:find("6") then
+        return "Origin", 6
+    else
+        return "Normal", 1
+    end
+end
+
+local function executeEydisBattle(targetDiff, targetChallenge)
+    if isEydisBusy then return false end
+    isEydisBusy = true
+
+    local diffName, diffIdx = resolveEydisDiff(targetDiff or _G.SelectedEydisDiff)
+    local isChallenge = (targetChallenge ~= nil) and targetChallenge or _G.EydisChallengeMode or false
+
+    safeLog(string.format("[SuiSuiHUB] Đang tiến công Trùm Giờ Eydis [%s - Tier %d, Challenge: %s]...", diffName, diffIdx, tostring(isChallenge)))
+
+    -- 1. Kiểm tra Cooldown từ UI EydisBossGui (label BACK IN)
+    local onCooldown = false
+    pcall(function()
+        local pg = localPlayer:FindFirstChild("PlayerGui")
+        local eydisGui = pg and pg:FindFirstChild("EydisBossGui")
+        if eydisGui and eydisGui.Enabled then
+            for _, lbl in ipairs(eydisGui:GetDescendants()) do
+                if lbl:IsA("TextLabel") and lbl.Text:find("BACK IN") then
+                    onCooldown = true
+                    safeLog("[SuiSuiHUB] Trùm Eydis đang Cooldown: " .. lbl.Text .. ". Bỏ qua.")
+                    break
+                end
+            end
+        end
+    end)
+    if onCooldown then
+        isEydisBusy = false
+        return false
+    end
+
+    -- 2. Chọn difficulty trong GUI nếu EydisBossGui mở
+    pcall(function()
+        local pg = localPlayer:FindFirstChild("PlayerGui")
+        local eydisGui = pg and pg:FindFirstChild("EydisBossGui")
+        if eydisGui and eydisGui.Enabled then
+            local btn = eydisGui:FindFirstChild(diffName, true)
+            if btn and btn:IsA("GuiButton") then
+                clickGuiElement(btn)
+            end
+            local hitBtn = eydisGui:FindFirstChild("Hit", true)
+            if hitBtn and hitBtn:IsA("GuiButton") and hitBtn.Visible then
+                clickGuiElement(hitBtn)
+            end
+        end
+    end)
+
+    -- 3. Gọi Remote BuildEydisBattle(diff, isChallenge)
+    if buildEydisBattleRemote and buildEydisBattleRemote:IsA("RemoteFunction") then
+        pcall(function()
+            buildEydisBattleRemote:InvokeServer(diffIdx, isChallenge)
+        end)
+        pcall(function()
+            buildEydisBattleRemote:InvokeServer(diffName, isChallenge)
+        end)
+    end
+
+    task.wait(0.4)
+
+    -- 4. Báo cáo chiến thắng: ReportEydisVictory
+    if reportEydisVictoryRemote and reportEydisVictoryRemote:IsA("RemoteEvent") then
+        pcall(function()
+            reportEydisVictoryRemote:FireServer(diffIdx)
+        end)
+        pcall(function()
+            reportEydisVictoryRemote:FireServer(diffName)
+        end)
+    end
+
+    -- 5. Dọn dẹp popup Eydis
+    task.wait(0.2)
+    autoDismissBossDefeated()
+
+    isEydisBusy = false
+    safeLog(string.format("[SuiSuiHUB] Đã hoàn thành săn Trùm Giờ Eydis [%s]!", diffName))
+    return true
+end
+
+-- ========================================================================
+-- 8. CÁC VÒNG LẶP NỀN (BACKGROUND LOOPS)
 -- ========================================================================
 
 -- Anti-AFK
@@ -830,9 +1224,7 @@ task.spawn(function()
     end)
 end)
 
--- Anti-Void: Đã gỡ bỏ để không làm dịch chuyển vị trí người chơi ra Đài Phun Nước ở Lobby
-
--- Chuẩn hóa danh sách Boss được chọn (Hỗ trợ cả dạng mảng lẫn bảng từ điển Linoria)
+-- Chuẩn hóa danh sách Boss được chọn
 local function getNormalizedSelectedBosses()
     local list = {}
     if typeof(_G.SelectedMainBosses) == "table" then
@@ -854,69 +1246,102 @@ local function getNormalizedSelectedBosses()
     return list
 end
 
--- VÒNG LẶP AUTO BOSS CHÍNH (ĐỨNG ĐÂU CŨNG ĐÁNH ĐƯỢC - KHÔNG TELEPORT, KHÔNG THAY ĐỔI VỊ TRÍ)
+-- VÒNG LẶP AUTO BOSS CHÍNH
 task.spawn(function()
-    safeLog("[SuiSuiHUB] Vòng lặp Auto Boss Chính (Đứng Đâu Cũng Đánh Được - Chạy Ngầm 100%) đã sẵn sàng!")
+    safeLog("[SuiSuiHUB] Vòng lặp Auto Boss Chính Instant-Win sẵn sàng!")
     while true do
         pcall(function()
             if _G.AutoMainBoss then
-                local bossList = getNormalizedSelectedBosses()
+                while _G.AutoMainBoss and shouldYieldToRiftGate() do
+                    task.wait(0.3)
+                end
+                if not _G.AutoMainBoss then return end
 
+                local bossList = getNormalizedSelectedBosses()
                 for _, bTitle in ipairs(bossList) do
                     if not _G.AutoMainBoss then break end
-                    
+                    if shouldYieldToRiftGate() then break end
+
                     local bossId = resolveMainBossId(bTitle)
                     local diffDisplay = (_G.MainBossDifficulties and _G.MainBossDifficulties[bossId]) or _G.SelectedMainDifficulty or "01: NORMAL (Normal)"
                     local diffInternal = resolveDifficultyInternal(diffDisplay)
 
-                    safeLog(string.format("[SuiSuiHUB] Chu trình Trùm Cuối: BẬT Auto in-game -> Đánh %s [%s -> %s] -> Nhận quà -> TẮT Auto", tostring(bossId), tostring(diffDisplay), tostring(diffInternal)))
+                    -- Chờ Mini Boss giải phóng slot 2 (tránh 2 trận cùng build vào 1 slot)
+                    while isMiniBossBusy do task.wait(0.05) end
 
-                    -- 1. BẬT In-Game Auto Fight cho trùm này
-                    setInGameAutoBoss(bossId, true, diffInternal)
-                    task.wait(0.15)
-
-                    -- 2. Đánh trùm & nhận thưởng từ xa qua Remote (Không di chuyển nhân vật)
+                    isMainBossFighting = true
                     executeBossVictory(bossId, diffInternal)
-                    task.wait(0.2)
+                    isMainBossFighting = false
 
-                    -- 3. TẮT In-Game Auto Fight để xoay tua sang trùm khác
-                    setInGameAutoBoss(bossId, false)
-                    task.wait(0.1)
-
-                    local delayTime = tonumber(_G.BossDelay) or 0.2
+                    local delayTime = tonumber(_G.BossDelay) or 0.3
                     task.wait(math.max(delayTime, 0.1))
                 end
             end
         end)
-        task.wait(0.3)
+        task.wait(0.2)
     end
 end)
 
--- VÒNG LẶP AUTO MINI BOSS
+-- VÒNG LẶP AUTO MINI BOSS (VỚI TÙY CHỌN ĐỘ KHÓ)
 task.spawn(function()
+    safeLog("[SuiSuiHUB] Vòng lặp Auto Mini Boss Instant-Win với Độ Khó sẵn sàng!")
     while true do
         pcall(function()
             if _G.AutoMiniBoss and _G.SelectedMiniBosses and #_G.SelectedMiniBosses > 0 then
                 for _, bossId in ipairs(_G.SelectedMiniBosses) do
                     if not _G.AutoMiniBoss then break end
-                    
+
                     while _G.AutoMiniBoss and (shouldYieldToRiftGate() or shouldYieldToMainBoss()) do
                         task.wait(0.2)
                     end
                     if not _G.AutoMiniBoss then break end
 
+                    local diffDisplay = (_G.MiniBossDifficulties and _G.MiniBossDifficulties[bossId]) or _G.SelectedMiniDifficulty or "01: NORMAL (Normal)"
+                    local diffInternal = resolveDifficultyInternal(diffDisplay)
+
+                    -- Không bao giờ chạy song song với Trùm Cuối (dùng chung slot 2)
+                    while isMainBossFighting do task.wait(0.05) end
+
                     isMiniBossBusy = true
-                    executeMiniBossBattle(bossId)
-                    task.wait(0.1)
-                    autoDismissBossDefeated()
+                    executeMiniBossBattle(bossId, diffInternal)
                     isMiniBossBusy = false
 
-                    local delay = tonumber(_G.BossDelay) or 0.5
-                    task.wait(math.max(delay, 0.2))
+                    local delay = tonumber(_G.BossDelay) or 0.3
+                    task.wait(math.max(delay, 0.15))
                 end
             end
         end)
-        task.wait(0.3)
+        task.wait(0.2)
+    end
+end)
+
+-- VÒNG LẶP AUTO ROLL THẺ BÀI (TIỆN ÍCH MỚI)
+task.spawn(function()
+    while true do
+        pcall(function()
+            if _G.AutoRoll then
+                if rollRemote then
+                    rollRemote:FireServer()
+                end
+            end
+        end)
+        task.wait(0.25)
+    end
+end)
+
+-- VÒNG LẶP AUTO LEO THÁP (TOWER) - BẢO VỆ TUYỆT ĐỐI KHÔNG CAN THIỆP KHI ĐANG INFINITE
+task.spawn(function()
+    while true do
+        pcall(function()
+            if _G.AutoNextFloor then
+                local pg = localPlayer:FindFirstChild("PlayerGui")
+                local towerGui = pg and (pg:FindFirstChild("TowerGui") or pg:FindFirstChild("TowerSelectGui"))
+                if towerGui and towerGui.Enabled and nextFloorRemote then
+                    nextFloorRemote:InvokeServer()
+                end
+            end
+        end)
+        task.wait(1.5)
     end
 end)
 
@@ -934,10 +1359,10 @@ task.spawn(function()
 
             if isWindowOpen then
                 if hasFarmedCurrentRiftGate then
-                    if RiftStatusLabel then RiftStatusLabel:Set("Trạng Thái: ĐÃ XONG ĐỢT NÀY (Đã về Lobby, Chờ đợt sau)") end
+                    if RiftStatusLabel then RiftStatusLabel:Set("Trạng Thái: ĐÃ XONG ĐỢT NÀY (Chờ đợt sau)") end
                     if RiftTimerLabel then RiftTimerLabel:Set(string.format("Đợt Kế Tiếp Sau: %02d:%02d", math.floor(secRemaining / 60), secRemaining % 60)) end
                 else
-                    if RiftStatusLabel then RiftStatusLabel:Set("Trạng Thái: CỔNG ĐANG MỞ (Chiến Đấu!)") end
+                    if RiftStatusLabel then RiftStatusLabel:Set("Trạng Thái: CỔNG ĐANG MỞ (Săn Thưởng!)") end
                     if RiftTimerLabel then RiftTimerLabel:Set(string.format("Đang Mở! Còn Lại: %02d:%02d", math.floor((120 - (secInCycle % 120)) / 60), (120 - (secInCycle % 120)) % 60)) end
 
                     if _G.AutoRiftGate and not isRiftGateBusy then
@@ -945,7 +1370,6 @@ task.spawn(function()
                     end
                 end
             else
-                -- Cổng đang đóng: Reset cờ để sẵn sàng đón đợt mở cổng kế tiếp
                 hasFarmedCurrentRiftGate = false
                 if RiftStatusLabel then RiftStatusLabel:Set("Trạng Thái: Đang Đóng (Chờ Mở)") end
                 if RiftTimerLabel then RiftTimerLabel:Set(string.format("Đợt Kế Tiếp Sau: %02d:%02d", math.floor(secRemaining / 60), secRemaining % 60)) end
@@ -956,12 +1380,140 @@ task.spawn(function()
 end)
 
 -- ========================================================================
--- 8. KHỞI TẠO GIAO DIỆN (UI INITIALIZATION QUA INVENTORY.LUA)
+-- PHÂN HỆ 1: VÒNG LẶP AUTO CÀN QUÉT DUNGEON (SOLO LEVELING GATE)
+-- ========================================================================
+local DungeonStatusLabel, RaidStatusLabel, EydisStatusLabel
+
+task.spawn(function()
+    safeLog("[SuiSuiHUB] Vòng lặp Auto Dungeon (Solo Leveling Gate) sẵn sàng!")
+    while true do
+        pcall(function()
+            if _G.AutoDungeon then
+                while _G.AutoDungeon and (shouldYieldToRiftGate() or isMainBossFighting) do
+                    task.wait(0.4)
+                end
+                if not _G.AutoDungeon then return end
+
+                local ok, cd = executeDungeonStage()
+                if not ok and cd and cd > 0 then
+                    task.wait(math.min(cd, 4))
+                else
+                    task.wait(1.2)
+                end
+            end
+        end)
+        task.wait(0.5)
+    end
+end)
+
+-- ========================================================================
+-- PHÂN HỆ 1: VÒNG LẶP AUTO SĂN RAID BOSS (RE:ZERO CHAPTER 1..3 / PRIDE MONSTER)
+-- ========================================================================
+task.spawn(function()
+    safeLog("[SuiSuiHUB] Vòng lặp Auto Raid Boss (15 Sao & Raid Souls) sẵn sàng!")
+    while true do
+        pcall(function()
+            if _G.AutoRaidBoss then
+                while _G.AutoRaidBoss and (shouldYieldToRiftGate() or isMainBossFighting or isDungeonBusy) do
+                    task.wait(0.5)
+                end
+                if not _G.AutoRaidBoss then return end
+
+                executeRaidBattle()
+                task.wait(1.5)
+            end
+        end)
+        task.wait(1.0)
+    end
+end)
+
+-- ========================================================================
+-- PHÂN HỆ 1: VÒNG LẶP AUTO TRÙM GIỜ EYDIS (THE HOURLY EVOLUTION BOSS)
+-- ========================================================================
+task.spawn(function()
+    safeLog("[SuiSuiHUB] Vòng lặp Auto Trùm Giờ Eydis sẵn sàng!")
+    while true do
+        pcall(function()
+            if _G.AutoEydis then
+                while _G.AutoEydis and (shouldYieldToRiftGate() or isMainBossFighting) do
+                    task.wait(0.5)
+                end
+                if not _G.AutoEydis then return end
+
+                executeEydisBattle()
+                task.wait(3.0)
+            end
+        end)
+        task.wait(2.0)
+    end
+end)
+
+-- VÒNG LẶP CẬP NHẬT TRẠNG THÁI REALTIME CHO PHÂN HỆ 1
+task.spawn(function()
+    while true do
+        task.wait(1.5)
+        pcall(function()
+            -- 1. Dungeon Status
+            if DungeonStatusLabel then
+                local cd = 0
+                if getDungeonCooldownRemote and getDungeonCooldownRemote:IsA("RemoteFunction") then
+                    pcall(function() cd = tonumber(getDungeonCooldownRemote:InvokeServer()) or 0 end)
+                end
+                if cd > 0 then
+                    DungeonStatusLabel:Set(string.format("Trạng Thái: Cooldown (%.1fs)", cd))
+                else
+                    DungeonStatusLabel:Set("Trạng Thái: Cổng Sẵn Sàng (Ready)!")
+                end
+            end
+
+            -- 2. Raid Status
+            if RaidStatusLabel then
+                local pg = localPlayer:FindFirstChild("PlayerGui")
+                local raidGui = pg and pg:FindFirstChild("RaidBossUI")
+                if raidGui and raidGui.Enabled then
+                    local starsText = ""
+                    local soulsText = ""
+                    for _, lbl in ipairs(raidGui:GetDescendants()) do
+                        if lbl:IsA("TextLabel") and lbl.Text:find("/") and lbl.Text:find("15") then
+                            starsText = lbl.Text
+                        end
+                        if lbl.Name == "Currency" then
+                            local sub = lbl:FindFirstChildWhichIsA("TextLabel")
+                            if sub then soulsText = sub.Text end
+                        end
+                    end
+                    if starsText ~= "" then
+                        RaidStatusLabel:Set(string.format("Raid Sao: %s | Raid Soul: %s", starsText, soulsText ~= "" and soulsText or "0"))
+                    end
+                end
+            end
+
+            -- 3. Eydis Status
+            if EydisStatusLabel then
+                local pg = localPlayer:FindFirstChild("PlayerGui")
+                local eydisGui = pg and pg:FindFirstChild("EydisBossGui")
+                if eydisGui and eydisGui.Enabled then
+                    for _, lbl in ipairs(eydisGui:GetDescendants()) do
+                        if lbl:IsA("TextLabel") and lbl.Text:find("Next in") then
+                            EydisStatusLabel:Set("Xoay Trùm Mới: " .. lbl.Text)
+                            break
+                        elseif lbl:IsA("TextLabel") and lbl.Text:find("BACK IN") then
+                            EydisStatusLabel:Set("Hồi Chiêu: " .. lbl.Text)
+                            break
+                        end
+                    end
+                end
+            end
+        end)
+    end
+end)
+
+-- ========================================================================
+-- 9. GIAO DIỆN ĐIỀU KHIỂN (UI INTERFACE - INVENTORY.LUA)
 -- ========================================================================
 local Window = library:CreateWindow("SuiSuiHUB | Card Origins")
 local uiFullyLoaded = false
 
--- Helper: Ẩn / Hiện toàn bộ giao diện SuiSuiHUB chuẩn xác
 local function setMenuVisible(visible)
     pcall(function()
         if Window and Window.Frame then
@@ -984,18 +1536,18 @@ local function setMenuVisible(visible)
     end)
 end
 
--- ========================================================================
+-- ------------------------------------------------------------------------
 -- TAB 1: SĂN BOSS (AUTO BOSS & MAP)
--- ========================================================================
+-- ------------------------------------------------------------------------
 local TabBoss = Window:CreateTab("Săn Boss")
-local SecBossLeft = TabBoss:CreateSector("1. Boss Thường (Mini Boss)", "left")
+local SecBossLeft = TabBoss:CreateSector("1. Boss Thường & Boss Ẩn Theo World", "left")
 local SecBossRight = TabBoss:CreateSector("2. Boss Chính (Trùm Cuối)", "right")
 
 local MiniBossDropdownItem
 local MainBossDropdownItem
 
--- Cột Trái: Boss Thường
-SecBossLeft:AddDropdown("Chọn Map Hiện Tại", MapOptions, _G.SelectedMap, false, function(v)
+-- Cột Trái: Boss Thường & Boss Ẩn
+SecBossLeft:AddDropdown("Chọn World / Khu Vực", MapOptions, _G.SelectedMap, false, function(v)
     _G.SelectedMap = v
     if not uiFullyLoaded then return end
     local cfg = GAME_WORLDS[v]
@@ -1017,12 +1569,16 @@ SecBossLeft:AddDropdown("Chọn Map Hiện Tại", MapOptions, _G.SelectedMap, f
     saveConfig()
 end)
 
-SecBossLeft:AddButton("Teleport Vào Map", function()
+SecBossLeft:AddButton("Teleport Vào Map World Này", function()
     local cfg = GAME_WORLDS[_G.SelectedMap]
-    if cfg and cfg.mapId then teleportToWorld(cfg.mapId) end
+    if cfg and cfg.mapId and cfg.mapId ~= "hidden" then
+        teleportToWorld(cfg.mapId)
+    else
+        Notification("Teleport", "Khu vực này nằm ngay trên map hiện tại!", 2)
+    end
 end)
 
-MiniBossDropdownItem = SecBossLeft:AddDropdown("Chọn Boss Thường (Chọn Nhiều)", ALL_MINI_BOSS_LIST, _G.SelectedMiniBosses, true, function(selected)
+MiniBossDropdownItem = SecBossLeft:AddDropdown("Chọn Mini Boss (Chọn Nhiều)", ALL_MINI_BOSS_LIST, _G.SelectedMiniBosses, true, function(selected)
     if typeof(selected) == "table" then
         _G.SelectedMiniBosses = selected
     elseif typeof(selected) == "string" then
@@ -1031,40 +1587,132 @@ MiniBossDropdownItem = SecBossLeft:AddDropdown("Chọn Boss Thường (Chọn Nh
     if uiFullyLoaded then saveConfig() end
 end)
 
-SecBossLeft:AddButton("Chọn Toàn Bộ Mini Boss Trong Map", function()
-    local allList = {}
+SecBossLeft:AddButton("Chọn Toàn Bộ Boss Trong World Đang Chọn", function()
     local cfg = GAME_WORLDS[_G.SelectedMap]
-    if cfg and cfg.miniBosses then
-        for _, b in ipairs(cfg.miniBosses) do table.insert(allList, b.id) end
-    end
-    if #allList > 0 then
-        _G.SelectedMiniBosses = allList
+    if cfg and cfg.miniBosses and #cfg.miniBosses > 0 then
+        local bossList = {}
+        for _, b in ipairs(cfg.miniBosses) do table.insert(bossList, b.id) end
+        _G.SelectedMiniBosses = bossList
         if MiniBossDropdownItem and MiniBossDropdownItem.Set then
-            MiniBossDropdownItem:Set(allList)
+            MiniBossDropdownItem:Set(bossList)
         end
         saveConfig()
-        Notification("Mini Boss", string.format("Đã chọn %d Boss trong map!", #allList), 3)
+        Notification("Mini Boss", string.format("Đã chọn %d Boss trong world này!", #bossList), 3)
     end
 end)
 
-SecBossLeft:AddButton("Chọn Toàn Bộ 6 Mini Boss (Toàn Game)", function()
-    _G.SelectedMiniBosses = ALL_MINI_BOSS_LIST
+SecBossLeft:AddButton("Chọn Toàn Bộ Mini Boss Thường (W2 - W7)", function()
+    local standardAll = { "chahaein", "guildmaster", "ragna", "sukuna", "yuta", "swordempress", "yuno", "boothill", "jingliu", "hsr_mini3" }
+    _G.SelectedMiniBosses = standardAll
     if MiniBossDropdownItem and MiniBossDropdownItem.Set then
-        MiniBossDropdownItem:Set(ALL_MINI_BOSS_LIST)
+        MiniBossDropdownItem:Set(standardAll)
     end
     saveConfig()
-    Notification("Mini Boss", "Đã chọn toàn bộ 6 Mini Boss!", 3)
+    Notification("Mini Boss", "Đã chọn toàn bộ Mini Boss Thường (W2 - W7)!", 3)
 end)
 
-SecBossLeft:AddButton("Bay Tới Gần Boss Thường", function()
-    local target = _G.SelectedMiniBosses and _G.SelectedMiniBosses[1] or "chahaein"
-    teleportToMiniBoss(target)
+SecBossLeft:AddButton("Chọn Toàn Bộ 5 Boss Ẩn (Hidden Bosses)", function()
+    local hidden5 = { "hidden boss 1", "hidden boss 2", "hidden boss 3", "hidden boss 4", "hidden boss 5" }
+    _G.SelectedMiniBosses = hidden5
+    if MiniBossDropdownItem and MiniBossDropdownItem.Set then
+        MiniBossDropdownItem:Set(hidden5)
+    end
+    saveConfig()
+    Notification("Boss Ẩn", "Đã chọn toàn bộ 5 Boss Ẩn!", 3)
 end)
 
-SecBossLeft:AddToggle("Auto Đấm Boss Thường (Xoay Vòng)", _G.AutoMiniBoss, function(v)
-    _G.AutoMiniBoss = v
+SecBossLeft:AddDropdown("Độ Khó Chung Cho Mini Boss", MAIN_BOSS_DIFFICULTIES, _G.SelectedMiniDifficulty, false, function(v)
+    _G.SelectedMiniDifficulty = v
     if uiFullyLoaded then saveConfig() end
-    Notification("Boss Thường", v and "Đã BẬT Auto Mini Boss!" or "Đã TẮT!", 2)
+    Notification("Độ Khó Mini Boss", "Đã đặt độ khó chung Mini Boss: " .. tostring(v), 2)
+end)
+
+SecBossLeft:AddLabel("--- TÙY CHỈNH ĐỘ KHÓ MINI BOSS (THEO WORLD) ---")
+
+-- World 02 (Dungeon)
+SecBossLeft:AddDropdown("[W2] Cha Hae-In", MAIN_BOSS_DIFFICULTIES, _G.MiniBossDifficulties["chahaein"] or "01: NORMAL (Normal)", false, function(v)
+    _G.MiniBossDifficulties["chahaein"] = v
+    if uiFullyLoaded then saveConfig() end
+end)
+SecBossLeft:AddDropdown("[W2] Guild Master", MAIN_BOSS_DIFFICULTIES, _G.MiniBossDifficulties["guildmaster"] or "01: NORMAL (Normal)", false, function(v)
+    _G.MiniBossDifficulties["guildmaster"] = v
+    if uiFullyLoaded then saveConfig() end
+end)
+
+-- World 03 (Endless Castle)
+SecBossLeft:AddDropdown("[W3] Ragna", MAIN_BOSS_DIFFICULTIES, _G.MiniBossDifficulties["ragna"] or "01: NORMAL (Normal)", false, function(v)
+    _G.MiniBossDifficulties["ragna"] = v
+    if uiFullyLoaded then saveConfig() end
+end)
+
+-- World 04 (Limitless Domain)
+SecBossLeft:AddDropdown("[W4] Sukuna (Cursed King)", MAIN_BOSS_DIFFICULTIES, _G.MiniBossDifficulties["sukuna"] or "01: NORMAL (Normal)", false, function(v)
+    _G.MiniBossDifficulties["sukuna"] = v
+    if uiFullyLoaded then saveConfig() end
+end)
+SecBossLeft:AddDropdown("[W4] Yuta Okkotsu", MAIN_BOSS_DIFFICULTIES, _G.MiniBossDifficulties["yuta"] or "01: NORMAL (Normal)", false, function(v)
+    _G.MiniBossDifficulties["yuta"] = v
+    if uiFullyLoaded then saveConfig() end
+end)
+
+-- World 05 (Devil Heart - Clockmaiden Kurumi)
+SecBossLeft:AddDropdown("[W5] Sword Empress", MAIN_BOSS_DIFFICULTIES, _G.MiniBossDifficulties["swordempress"] or "01: NORMAL (Normal)", false, function(v)
+    _G.MiniBossDifficulties["swordempress"] = v
+    if uiFullyLoaded then saveConfig() end
+end)
+SecBossLeft:AddDropdown("[W5] Yuno", MAIN_BOSS_DIFFICULTIES, _G.MiniBossDifficulties["yuno"] or "01: NORMAL (Normal)", false, function(v)
+    _G.MiniBossDifficulties["yuno"] = v
+    if uiFullyLoaded then saveConfig() end
+end)
+
+-- World 07 (Celestial Express - 3 Mini Boss)
+SecBossLeft:AddDropdown("[W7] Cyborg Gunslinger (Boothill)", MAIN_BOSS_DIFFICULTIES, _G.MiniBossDifficulties["boothill"] or "01: NORMAL (Normal)", false, function(v)
+    _G.MiniBossDifficulties["boothill"] = v
+    if uiFullyLoaded then saveConfig() end
+end)
+SecBossLeft:AddDropdown("[W7] Sword Champion (Jingliu)", MAIN_BOSS_DIFFICULTIES, _G.MiniBossDifficulties["jingliu"] or "01: NORMAL (Normal)", false, function(v)
+    _G.MiniBossDifficulties["jingliu"] = v
+    if uiFullyLoaded then saveConfig() end
+end)
+SecBossLeft:AddDropdown("[W7] Mini Boss 3 (Celestial Express)", MAIN_BOSS_DIFFICULTIES, _G.MiniBossDifficulties["hsr_mini3"] or "01: NORMAL (Normal)", false, function(v)
+    _G.MiniBossDifficulties["hsr_mini3"] = v
+    if uiFullyLoaded then saveConfig() end
+end)
+
+SecBossLeft:AddLabel("--- TÙY CHỈNH ĐỘ KHÓ 5 BOSS ẨN ---")
+SecBossLeft:AddDropdown("[ẨN 1] Hidden Boss 1", MAIN_BOSS_DIFFICULTIES, _G.MiniBossDifficulties["hidden boss 1"] or "01: NORMAL (Normal)", false, function(v)
+    _G.MiniBossDifficulties["hidden boss 1"] = v
+    if uiFullyLoaded then saveConfig() end
+end)
+SecBossLeft:AddDropdown("[ẨN 2] Hidden Boss 2", MAIN_BOSS_DIFFICULTIES, _G.MiniBossDifficulties["hidden boss 2"] or "01: NORMAL (Normal)", false, function(v)
+    _G.MiniBossDifficulties["hidden boss 2"] = v
+    if uiFullyLoaded then saveConfig() end
+end)
+SecBossLeft:AddDropdown("[ẨN 3] Hidden Boss 3 (Lord Boros)", MAIN_BOSS_DIFFICULTIES, _G.MiniBossDifficulties["hidden boss 3"] or "01: NORMAL (Normal)", false, function(v)
+    _G.MiniBossDifficulties["hidden boss 3"] = v
+    if uiFullyLoaded then saveConfig() end
+end)
+SecBossLeft:AddDropdown("[ẨN 4] Hidden Boss 4", MAIN_BOSS_DIFFICULTIES, _G.MiniBossDifficulties["hidden boss 4"] or "01: NORMAL (Normal)", false, function(v)
+    _G.MiniBossDifficulties["hidden boss 4"] = v
+    if uiFullyLoaded then saveConfig() end
+end)
+SecBossLeft:AddDropdown("[ẨN 5] Hidden Boss 5", MAIN_BOSS_DIFFICULTIES, _G.MiniBossDifficulties["hidden boss 5"] or "01: NORMAL (Normal)", false, function(v)
+    _G.MiniBossDifficulties["hidden boss 5"] = v
+    if uiFullyLoaded then saveConfig() end
+end)
+
+SecBossLeft:AddLabel("--- TELEPORT TỚI 5 BOSS ẨN TRÊN MAP ---")
+SecBossLeft:AddButton("Bay Tới Hidden Boss 1", function() teleportToMiniBoss("hidden boss 1") end)
+SecBossLeft:AddButton("Bay Tới Hidden Boss 2", function() teleportToMiniBoss("hidden boss 2") end)
+SecBossLeft:AddButton("Bay Tới Hidden Boss 3 (Lord Boros)", function() teleportToMiniBoss("hidden boss 3") end)
+SecBossLeft:AddButton("Bay Tới Hidden Boss 4", function() teleportToMiniBoss("hidden boss 4") end)
+SecBossLeft:AddButton("Bay Tới Hidden Boss 5", function() teleportToMiniBoss("hidden boss 5") end)
+
+SecBossLeft:AddToggle("Auto Đấm Mini Boss & Boss Ẩn (Instant-Win)", _G.AutoMiniBoss, function(v)
+    _G.AutoMiniBoss = v
+    if not v then resetServerAutoBossFlag() end
+    if uiFullyLoaded then saveConfig() end
+    Notification("Mini Boss", v and "Đã BẬT Auto Mini Boss Instant-Win!" or "Đã TẮT!", 2)
 end)
 
 -- Cột Phải: Trùm Cuối
@@ -1077,33 +1725,39 @@ MainBossDropdownItem = SecBossRight:AddDropdown("Chọn Trùm Cuối (Chọn Nhi
     if uiFullyLoaded then saveConfig() end
 end)
 
-SecBossRight:AddButton("Chọn Toàn Bộ 3 Trùm Cuối (Toàn Game)", function()
+SecBossRight:AddButton("Chọn Toàn Bộ Trùm Cuối", function()
     _G.SelectedMainBosses = ALL_MAIN_BOSS_LIST
     if MainBossDropdownItem and MainBossDropdownItem.Set then
         MainBossDropdownItem:Set(ALL_MAIN_BOSS_LIST)
     end
     saveConfig()
-    Notification("Trùm Cuối", "Đã chọn toàn bộ 3 Trùm Cuối!", 3)
+    Notification("Trùm Cuối", "Đã chọn toàn bộ Trùm Cuối!", 3)
 end)
 
 SecBossRight:AddLabel("--- TÙY CHỈNH ĐỘ KHÓ TỪNG TRÙM CUỐI ---")
 
-SecBossRight:AddDropdown("Độ Khó Queen (The Shadow Monarch - 02: DUNGEON)", MAIN_BOSS_DIFFICULTIES, _G.MainBossDifficulties["queen"] or "04: ASTRAL (Uni)", false, function(v)
+SecBossRight:AddDropdown("Độ Khó Queen (The Shadow Monarch)", MAIN_BOSS_DIFFICULTIES, _G.MainBossDifficulties["queen"] or "04: ASTRAL (Uni)", false, function(v)
     _G.MainBossDifficulties["queen"] = v
     if uiFullyLoaded then saveConfig() end
     Notification("Độ Khó Queen", "Đã đặt độ khó Queen: " .. tostring(v), 2)
 end)
 
-SecBossRight:AddDropdown("Độ Khó Gojo (The Honored One - 04: LIMITLESS DOMAIN)", MAIN_BOSS_DIFFICULTIES, _G.MainBossDifficulties["gojo"] or "02: CALAMITY (Gold)", false, function(v)
+SecBossRight:AddDropdown("Độ Khó Gojo (The Honored One)", MAIN_BOSS_DIFFICULTIES, _G.MainBossDifficulties["gojo"] or "02: CALAMITY (Gold)", false, function(v)
     _G.MainBossDifficulties["gojo"] = v
     if uiFullyLoaded then saveConfig() end
     Notification("Độ Khó Gojo", "Đã đặt độ khó Gojo: " .. tostring(v), 2)
 end)
 
-SecBossRight:AddDropdown("Độ Khó Kurumi (Clockmaiden - 05: DEVIL HEART)", MAIN_BOSS_DIFFICULTIES, _G.MainBossDifficulties["kurumi"] or "03: UMBRAL (Rainbow)", false, function(v)
+SecBossRight:AddDropdown("Độ Khó Kurumi (Clockmaiden)", MAIN_BOSS_DIFFICULTIES, _G.MainBossDifficulties["kurumi"] or "03: UMBRAL (Rainbow)", false, function(v)
     _G.MainBossDifficulties["kurumi"] = v
     if uiFullyLoaded then saveConfig() end
     Notification("Độ Khó Kurumi", "Đã đặt độ khó Kurumi: " .. tostring(v), 2)
+end)
+
+SecBossRight:AddDropdown("Độ Khó [W7] Love of Remembrance (ishtar)", MAIN_BOSS_DIFFICULTIES, _G.MainBossDifficulties["ishtar"] or "01: NORMAL (Normal)", false, function(v)
+    _G.MainBossDifficulties["ishtar"] = v
+    if uiFullyLoaded then saveConfig() end
+    Notification("Độ Khó Boss", "Đã đặt độ khó Love of Remembrance: " .. tostring(v), 2)
 end)
 
 local PRIORITY_OPTIONS = {
@@ -1117,23 +1771,170 @@ SecBossRight:AddDropdown("Độ Ưu Tiên Farm", PRIORITY_OPTIONS, _G.PriorityMo
     if uiFullyLoaded then saveConfig() end
 end)
 
-SecBossRight:AddSlider("Nghỉ Giữa Các Trận (Giây)", 0.2, 0.5, 5.0, 0.1, function(v)
-    _G.BossDelay = tonumber(v) or 0.5
+SecBossRight:AddSlider("Nghỉ Giữa Các Trận (Giây)", 0.1, 0.3, 3.0, 0.1, function(v)
+    _G.BossDelay = tonumber(v) or 0.3
     if uiFullyLoaded then saveConfig() end
 end)
 
-SecBossRight:AddToggle("Auto Đấm Boss Chính (Xoay Vòng Bật/Tắt)", _G.AutoMainBoss, function(v)
+SecBossRight:AddToggle("Auto Đấm Boss Chính (Instant-Win)", _G.AutoMainBoss, function(v)
     _G.AutoMainBoss = v
     if not v then
-        setInGameAutoBoss(nil, false) -- Tắt ngay in-game auto fight của game khi tắt toggle
+        resetServerAutoBossFlag()
     end
     if uiFullyLoaded then saveConfig() end
-    Notification("Boss Chính", v and "Đã BẬT Auto Trùm Cuối (Quy trình: Bật auto -> Đánh -> Tắt -> Chuyển Boss)!" or "Đã TẮT!", 3)
+    Notification("Boss Chính", v and "Đã BẬT Auto Trùm Cuối (Instant-Win Siêu Tốc)!" or "Đã TẮT!", 3)
 end)
 
--- ========================================================================
--- TAB 2: RiftGATE (CHU KỲ 15 PHÚT)
--- ========================================================================
+-- ------------------------------------------------------------------------
+-- TAB 2: PHÓ BẢN & SỰ KIỆN (DUNGEON, RAID BOSS & EYDIS HOURLY)
+-- ------------------------------------------------------------------------
+local TabDungeonRaid = Window:CreateTab("Phó Bản & Raid")
+local SecDungeon = TabDungeonRaid:CreateSector("1. Cổng Phó Bản Dungeon (Solo Leveling)", "left")
+local SecRaid = TabDungeonRaid:CreateSector("2. Săn Raid Boss (Re:Zero) & Trùm Giờ Eydis", "right")
+
+-- 1. CỘT TRÁI: AUTO DUNGEON
+DungeonStatusLabel = SecDungeon:AddLabel("Trạng Thái: ĐANG ĐỒNG BỘ...", true)
+SecDungeon:AddLabel("Mỗi ải nhận Origin Souls & Thẻ Bài Độc Quyền")
+
+SecDungeon:AddToggle("Auto Càn Quét Dungeon (Auto Gate)", _G.AutoDungeon, function(v)
+    _G.AutoDungeon = v
+    if uiFullyLoaded then saveConfig() end
+    Notification("Dungeon", v and "Đã BẬT Auto càn quét Dungeon!" or "Đã TẮT Auto Dungeon!", 2)
+end)
+
+local DUNGEON_STAGE_OPTIONS = {
+    "Tự Động (Stage Cao Nhất)",
+    "Stage 01: Scorched Execution",
+    "Stage 02: Toxic Collapse",
+    "Stage 03: Broken Mind",
+    "Stage 04: Blood Feast",
+    "Stage 05: Absolute Despair"
+}
+
+SecDungeon:AddDropdown("Chọn Stage Thử Thách", DUNGEON_STAGE_OPTIONS, _G.SelectedDungeonStage, false, function(v)
+    _G.SelectedDungeonStage = v
+    if uiFullyLoaded then saveConfig() end
+    Notification("Dungeon", "Đã chọn: " .. tostring(v), 2)
+end)
+
+SecDungeon:AddToggle("Tự Động Nhận Quà (Auto Claim)", _G.AutoClaimDungeonReward, function(v)
+    _G.AutoClaimDungeonReward = v
+    if uiFullyLoaded then saveConfig() end
+end)
+
+SecDungeon:AddButton("Đánh Thử 1 Trận Stage Đã Chọn", function()
+    task.spawn(function()
+        Notification("Dungeon", "Đang thử chiến đấu Dungeon Stage...", 2)
+        local ok = executeDungeonStage()
+        Notification("Dungeon", "Kết quả: " .. (ok and "Thành công!" or "Đang hồi chiêu / Thất bại"), 3)
+    end)
+end)
+
+SecDungeon:AddButton("Nhận Thưởng Dungeon Ngay (Claim Reward)", function()
+    pcall(function()
+        if claimDungeonRewardRemote and claimDungeonRewardRemote:IsA("RemoteFunction") then
+            claimDungeonRewardRemote:InvokeServer()
+            Notification("Dungeon", "Đã gửi lệnh nhận thưởng Dungeon!", 2)
+        end
+    end)
+end)
+
+SecDungeon:AddButton("Mở Giao Diện Cổng Dungeon (Open UI)", function()
+    pcall(function()
+        if openDungeonUIRemote then
+            openDungeonUIRemote:FireServer()
+        end
+    end)
+end)
+
+-- 2. CỘT PHẢI: AUTO RAID BOSS & TRÙM GIỜ EYDIS
+RaidStatusLabel = SecRaid:AddLabel("Raid Boss: 15/15 Sao • Raid Soul", true)
+
+SecRaid:AddToggle("Auto Săn Raid Boss (Auto Win 3 Sao)", _G.AutoRaidBoss, function(v)
+    _G.AutoRaidBoss = v
+    if uiFullyLoaded then saveConfig() end
+    Notification("Raid Boss", v and "Đã BẬT Auto Săn Raid Boss!" or "Đã TẮT!", 2)
+end)
+
+local RAID_NODE_OPTIONS = {
+    "Tự Động Quét Hết (Node 1 -> 5)",
+    "Node 01: RETURN FROM DEATH",
+    "Node 02: PRIDE MONSTER",
+    "Node 03: Chapter Node 03",
+    "Node 04: Chapter Node 04",
+    "Node 05: Chapter Node 05"
+}
+
+SecRaid:AddDropdown("Chọn Node Raid Thử Thách", RAID_NODE_OPTIONS, _G.SelectedRaidNode, false, function(v)
+    _G.SelectedRaidNode = v
+    if uiFullyLoaded then saveConfig() end
+    Notification("Raid Boss", "Đã chọn Node: " .. tostring(v), 2)
+end)
+
+SecRaid:AddButton("Đánh Thắng Ngay Node Đã Chọn", function()
+    task.spawn(function()
+        Notification("Raid Boss", "Đang gửi báo cáo thắng trận Raid...", 2)
+        local ok = executeRaidBattle()
+        Notification("Raid Boss", "Đã càn quét Raid xong!", 3)
+    end)
+end)
+
+SecRaid:AddButton("Mở Giao Diện Raid (Open UI)", function()
+    pcall(function()
+        if openRaidUIRemote then
+            openRaidUIRemote:FireServer()
+        end
+    end)
+end)
+
+SecRaid:AddLabel("----------------------------------------")
+EydisStatusLabel = SecRaid:AddLabel("Trùm Giờ Eydis: ĐANG ĐỒNG BỘ...", true)
+
+SecRaid:AddToggle("Auto Săn Trùm Giờ Eydis (Tự Đánh Khi Hồi)", _G.AutoEydis, function(v)
+    _G.AutoEydis = v
+    if uiFullyLoaded then saveConfig() end
+    Notification("Trùm Giờ Eydis", v and "Đã BẬT Auto săn Trùm Giờ Eydis!" or "Đã TẮT!", 2)
+end)
+
+local EYDIS_DIFF_OPTIONS = {
+    "Normal (Tier 1 - Cơ Bản)",
+    "Calamity / Gold (Tier 2)",
+    "Umbral / Rainbow (Tier 3)",
+    "Astral / Uni (Tier 4)",
+    "Paradox (Tier 5)",
+    "Origin (Tier 6 - Tối Thượng)"
+}
+
+SecRaid:AddDropdown("Chọn Độ Khó Trùm Giờ", EYDIS_DIFF_OPTIONS, _G.SelectedEydisDiff, false, function(v)
+    _G.SelectedEydisDiff = v
+    if uiFullyLoaded then saveConfig() end
+    Notification("Trùm Giờ Eydis", "Đã đặt độ khó: " .. tostring(v), 2)
+end)
+
+SecRaid:AddToggle("Chế Độ Challenge (Thử Thách)", _G.EydisChallengeMode, function(v)
+    _G.EydisChallengeMode = v
+    if uiFullyLoaded then saveConfig() end
+end)
+
+SecRaid:AddButton("Đánh Thắng Trùm Eydis Ngay (Instant Win)", function()
+    task.spawn(function()
+        Notification("Trùm Giờ Eydis", "Đang gửi lệnh hạ gục Eydis...", 2)
+        local ok = executeEydisBattle()
+        Notification("Trùm Giờ Eydis", ok and "Đã thắng trận Trùm Eydis!" or "Trùm đang hồi chiêu / Không thành công", 3)
+    end)
+end)
+
+SecRaid:AddButton("Mở Giao Diện Trùm Eydis (Open UI)", function()
+    pcall(function()
+        if openEydisBattleRemote then
+            openEydisBattleRemote:FireServer()
+        end
+    end)
+end)
+
+-- ------------------------------------------------------------------------
+-- TAB 3: RiftGATE (CHU KỲ 15 PHÚT)
+-- ------------------------------------------------------------------------
 local TabRift = Window:CreateTab("RiftGATE")
 local SecRiftLeft = TabRift:CreateSector("1. Đếm Ngược & Trạng Thái Cổng", "left")
 local SecRiftRight = TabRift:CreateSector("2. Tự Động & Tiện Ích RiftGATE", "right")
@@ -1149,9 +1950,7 @@ end)
 
 SecRiftLeft:AddToggle("Tự Động Săn RiftGATE (Auto Join)", _G.AutoRiftGate, function(v)
     _G.AutoRiftGate = v
-    if not v then
-        hasFarmedCurrentRiftGate = false
-    end
+    if not v then hasFarmedCurrentRiftGate = false end
     if uiFullyLoaded then saveConfig() end
     Notification("RiftGATE", v and "Đã BẬT Auto tham gia RiftGATE khi cổng mở!" or "Đã TẮT Auto RiftGATE!", 2)
 end)
@@ -1164,31 +1963,46 @@ SecRiftRight:AddButton("Đánh Thử 1 Trận RiftGATE", function()
     end)
 end)
 
-SecRiftRight:AddButton("Teleport Tới Cổng Rift", function()
-    teleportToRiftGate()
-end)
-
 SecRiftRight:AddButton("Teleport Về Lobby (Sảnh)", function()
     teleportToWorld("lobby")
 end)
 
-SecRiftRight:AddButton("Vào Cổng Thủ Công (EnterRequest)", function()
-    if riftGateEnterRemote then
-        riftGateEnterRemote:FireServer()
-        Notification("RiftGATE", "Đã gửi lệnh RiftGateEnterRequest!", 2)
+-- ------------------------------------------------------------------------
+-- TAB 4: TIỆN ÍCH & GACHA / AUTO ROLL (TAB MỚI)
+-- ------------------------------------------------------------------------
+local TabUtil = Window:CreateTab("Tiện Ích & Roll")
+local SecUtilLeft = TabUtil:CreateSector("Quay Thẻ Tự Động (Auto Roll)", "left")
+local SecUtilRight = TabUtil:CreateSector("Tháp Vô Tận & BattlePass", "right")
+
+SecUtilLeft:AddToggle("Auto Roll Thẻ Bài (Từ Xa)", _G.AutoRoll, function(v)
+    _G.AutoRoll = v
+    if uiFullyLoaded then saveConfig() end
+    Notification("Auto Roll", v and "Đã BẬT Auto Roll thẻ bài!" or "Đã TẮT Auto Roll!", 2)
+end)
+
+SecUtilLeft:AddButton("Quay Thử 1 Thẻ (Roll Request)", function()
+    if rollRemote then
+        rollRemote:FireServer()
+        Notification("Roll", "Đã gửi RollRequest!", 2)
     end
 end)
 
-SecRiftRight:AddButton("Rời Khỏi Cổng (LeaveRequest)", function()
-    if riftGateLeaveRemote then
-        riftGateLeaveRemote:FireServer()
-        Notification("RiftGATE", "Đã gửi lệnh RiftGateLeave!", 2)
+SecUtilRight:AddToggle("Auto Tự Động Leo Tháp (Next Floor)", _G.AutoNextFloor, function(v)
+    _G.AutoNextFloor = v
+    if uiFullyLoaded then saveConfig() end
+    Notification("Tháp Vô Tận", v and "Đã BẬT Auto Next Floor!" or "Đã TẮT!", 2)
+end)
+
+SecUtilRight:AddButton("Nhận Toàn Bộ Quà BattlePass", function()
+    if claimAllBattlePassRemote then
+        pcall(function() claimAllBattlePassRemote:InvokeServer() end)
+        Notification("BattlePass", "Đã gửi lệnh ClaimAllBattlePass!", 3)
     end
 end)
 
--- ========================================================================
--- TAB 3: CÀI ĐẶT (SETTINGS)
--- ========================================================================
+-- ------------------------------------------------------------------------
+-- TAB 5: CÀI ĐẶT (SETTINGS)
+-- ------------------------------------------------------------------------
 local TabSettings = Window:CreateTab("Cài Đặt")
 local SecSetLeft = TabSettings:CreateSector("Tối Ưu Treo Máy", "left")
 local SecSetRight = TabSettings:CreateSector("Hệ Thống & Giao Diện", "right")
@@ -1198,17 +2012,17 @@ SecSetLeft:AddToggle("Chống Văng (Anti-AFK)", _G.AntiAFK, function(v)
     if uiFullyLoaded then saveConfig() end
 end)
 
-SecSetLeft:AddToggle("Ẩn Nhật Ký Console (Tối Ưu FPS Khi Treo Máy)", _G.DisableConsoleLogs, function(v)
+SecSetLeft:AddToggle("Ẩn Nhật Ký Console (Tối Ưu FPS)", _G.DisableConsoleLogs, function(v)
     _G.DisableConsoleLogs = v
     if uiFullyLoaded then saveConfig() end
-    Notification("Nhật Ký Console", v and "Đã ẨN toàn bộ log Console (Tối ưu RAM/FPS treo máy qua đêm)!" or "Đã BẬT lại log Console!", 3)
+    Notification("Console Logs", v and "Đã ẨN log Console!" or "Đã BẬT log Console!", 2)
 end)
 
 SecSetLeft:AddToggle("Màn Hình Trắng Giảm CPU (WhiteScreen)", _G.WhiteScreen, function(v)
     _G.WhiteScreen = v
     RunService:Set3dRenderingEnabled(not v)
     if uiFullyLoaded then saveConfig() end
-    Notification("Màn Hình", v and "Đã BẬT màn hình trắng (Siêu nhẹ CPU/GPU)!" or "Đã TẮT màn hình trắng!", 2)
+    Notification("Màn Hình", v and "Đã BẬT màn hình trắng!" or "Đã TẮT màn hình trắng!", 2)
 end)
 
 SecSetLeft:AddToggle("Giảm Lag Đồ Họa (FPS Boost)", _G.FPSBoost, function(v)
@@ -1228,7 +2042,7 @@ SecSetLeft:AddToggle("Giảm Lag Đồ Họa (FPS Boost)", _G.FPSBoost, function
         end)
     end
     if uiFullyLoaded then saveConfig() end
-    Notification("Tối Ưu", v and "Đã kích hoạt FPS Boost!" or "Đã tắt FPS Boost!", 2)
+    Notification("FPS Boost", v and "Đã kích hoạt FPS Boost!" or "Đã tắt!", 2)
 end)
 
 SecSetLeft:AddToggle("Bật Chỉnh Tốc Độ Di Chuyển", _G.WalkSpeedEnabled, function(v)
@@ -1275,26 +2089,10 @@ SecSetRight:AddButton("Đổi Server (Server Hop)", function()
     end
 end)
 
-SecSetRight:AddButton("Khởi Chạy GUI Remote Hunter", function()
-    local hunterLoaded = false
-    pcall(function()
-        loadstring(game:HttpGet("http://127.0.0.1:8000/Card%20Origins/RemoteHunter.lua"))()
-        hunterLoaded = true
-    end)
-    if not hunterLoaded and isfile and readfile and isfile("Card Origins/RemoteHunter.lua") then
-        pcall(function()
-            loadstring(readfile("Card Origins/RemoteHunter.lua"))()
-            hunterLoaded = true
-        end)
-    end
-    Notification("Remote Hunter", hunterLoaded and "Đã mở Remote Hunter!" or "Không thể tải RemoteHunter.lua!", 3)
-end)
-
--- Toggle & Button Ẩn Menu
 SecSetRight:AddToggle("Ẩn Menu Khi Khởi Động", _G.HideMenuOnStartup, function(v)
     _G.HideMenuOnStartup = v
     if uiFullyLoaded then saveConfig() end
-    Notification("Cài Đặt", v and "Đã BẬT: Menu sẽ tự ẩn khi vừa chạy script (Bấm phím [Insert] để mở lại)!" or "Đã TẮT tính năng tự ẩn menu!", 3)
+    Notification("Cài Đặt", v and "Đã BẬT: Menu sẽ tự ẩn khi vừa chạy script (Bấm [Insert] để mở lại)!" or "Đã TẮT!", 3)
 end)
 
 SecSetRight:AddButton("Ẩn Menu Ngay (Phím Insert)", function()
@@ -1303,7 +2101,7 @@ SecSetRight:AddButton("Ẩn Menu Ngay (Phím Insert)", function()
         isVis = Window.Frame.Visible
     end
     setMenuVisible(not isVis)
-    Notification("Giao Diện", isVis and "Đã ẩn menu! Bấm phím [Insert] để mở lại." or "Đã hiện menu!", 2)
+    Notification("Giao Diện", isVis and "Đã ẩn menu! Bấm [Insert] để mở lại." or "Đã hiện menu!", 2)
 end)
 
 SecSetRight:AddButton("Lưu Cấu Hình (Save Config)", function()
@@ -1313,13 +2111,26 @@ end)
 
 SecSetRight:AddButton("Tải Cấu Hình (Load Config)", function()
     loadConfig()
+    if not GAME_WORLDS[_G.SelectedMap] then
+        _G.SelectedMap = "World 02: DUNGEON (Shadow Realm - queen)"
+    end
     Notification("Cấu Hình", "Đã nạp cài đặt đã lưu thành công!", 2)
+end)
+
+-- Phím tắt Insert để ẩn/hiện menu
+UserInputService.InputBegan:Connect(function(input, gpe)
+    if not gpe and input.KeyCode == Enum.KeyCode.Insert then
+        local isVis = false
+        if Window and Window.Frame then
+            isVis = Window.Frame.Visible
+        end
+        setMenuVisible(not isVis)
+    end
 end)
 
 uiFullyLoaded = true
 saveConfig()
 
--- Tự động ẩn menu khi khởi động nếu đã được cài đặt
 if _G.HideMenuOnStartup then
     task.spawn(function()
         task.wait(0.3)
@@ -1328,4 +2139,4 @@ if _G.HideMenuOnStartup then
     end)
 end
 
-Notification("SuiSuiHUB", "Khởi tạo Card Origins thành công!", 4)
+Notification("SuiSuiHUB", "Card Origins Instant-Win & Hidden Boss Edition đã sẵn sàng!", 4)

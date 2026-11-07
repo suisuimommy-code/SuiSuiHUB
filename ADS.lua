@@ -5,18 +5,33 @@ repeat task.wait(0.5) until localPlayer and localPlayer:FindFirstChild("PlayerGu
 MapSelection = {}
 RaidSelection = {}
 
-if game.PlaceId == 6938803436 or game.PlaceId == 6990129309 or game.PlaceId == 6990133340 or game.PlaceId == 6990131029 or game.PlaceId == 7338881230 or game.PlaceId == 7274690025 then
+if game.PlaceId == 6938803436 or game.PlaceId == 6990129309 or game.PlaceId == 6990133340 or game.PlaceId == 6990131029 or game.PlaceId == 7338881230 or game.PlaceId == 7274690025 or game.GameId == 2712497672 then
     local library
+    -- 1. Ưu tiên nạp UI Library từ GitHub chính thức (chạy 24/7 độc lập)
     pcall(function()
-        library = loadstring(game:HttpGet("http://127.0.0.1:8000/anime%20dimesion/ADS%20inventory.lua"))()
+        library = loadstring(game:HttpGet("https://raw.githubusercontent.com/suisuimommy-code/SuiSuiHUB/main/inventory.lua"))()
     end)
+    -- 2. Fallback Local Server khi test trên PC
     if not library then
         pcall(function()
-            library = loadstring(game:HttpGet("https://raw.githubusercontent.com/suisuimommy-code/SuiSuiHUB/main/anime%20dimesion/ADS%20inventory.lua"))()
+            library = loadstring(game:HttpGet("http://127.0.0.1:8000/inventory.lua"))()
         end)
     end
     if not library then
-        library = loadstring(game:HttpGet("https://raw.githubusercontent.com/FZ8nj2VdyKq/inventory/main/ADS%20inventory.lua"))()
+        pcall(function()
+            library = loadstring(game:HttpGet("http://127.0.0.1:8000/anime%20dimesion/ADS%20inventory.lua"))()
+        end)
+    end
+    -- 3. Fallback online dự phòng
+    if not library then
+        pcall(function()
+            library = loadstring(game:HttpGet("https://raw.githubusercontent.com/FZ8nj2VdyKq/inventory/main/ADS%20inventory.lua"))()
+        end)
+    end
+
+    if not library then
+        warn("[SuiSuiHUB] Không thể nạp thư viện UI inventory.lua!")
+        return
     end
     local function getGMT7Time(fmt)
         return os.date(fmt or "%H:%M:%S (%d/%m/%Y)", os.time() + (7 * 3600))

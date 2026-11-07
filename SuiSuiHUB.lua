@@ -46,8 +46,8 @@ local GameDatabase = {
         },
         UniverseIds = {},
         Paths = {
-            "AnimeEyes.lua",
-            "Anime Eyes/AnimeEyes.lua"
+            "Anime Eyes/AnimeEyes.lua",
+            "AnimeEyes.lua"
         },
         SignatureCheck = function()
             local rem = ReplicatedStorage:FindFirstChild("Remotes")
@@ -70,9 +70,9 @@ local GameDatabase = {
         },
         UniverseIds = {},
         Paths = {
-            "ADS.lua",
             "anime dimesion/ADS.lua",
-            "Anime dimesion/ADS.lua"
+            "Anime dimesion/ADS.lua",
+            "ADS.lua"
         }
     },
 
@@ -83,8 +83,8 @@ local GameDatabase = {
         },
         UniverseIds = {},
         Paths = {
-            "CardOrigins.lua",
-            "Card Origins/CardOrigins.lua"
+            "Card Origins/CardOrigins.lua",
+            "CardOrigins.lua"
         }
     }
 }
@@ -136,14 +136,8 @@ if not detectedGameConfig then
 end
 
 -- ========================================================================
--- 3. NẠP VÀ CHẠY ĐÚNG BẢN SUISUIHUB MASTER CỦA GAME ĐÓ
+-- 3. NẠP VÀ CHẠY ĐÚNG BẢN SUISUIHUB MASTER CỦA GAME ĐÓ (TỐC ĐỘ CAO ~0.2S)
 -- ========================================================================
-local LOCAL_HOSTS = {
-    "http://127.0.0.1:8000",
-    "http://192.168.2.203:8000",
-    "http://10.0.2.2:8000",
-    "http://172.18.144.1:8000"
-}
 local GITHUB_HOST = "https://raw.githubusercontent.com/suisuimommy-code/SuiSuiHUB/main"
 local cacheBuster = "?t=" .. tostring(os.time())
 
@@ -153,34 +147,19 @@ local scriptSource = nil
 for _, rawPath in ipairs(detectedGameConfig.Paths or {}) do
     local cleanPath = rawPath:gsub(" ", "%%20")
 
-    -- 1. Ưu tiên nạp từ Local Server (PC hoặc Giả lập MuMu/Android qua LAN)
-    for _, host in ipairs(LOCAL_HOSTS) do
-        if not scriptContent then
-            pcall(function()
-                local url = string.format("%s/%s%s", host, cleanPath, cacheBuster)
-                local res = game:HttpGet(url)
-                if res and #res > 100 and not res:find("404: Not Found") and not res:find("Error response") then
-                    scriptContent = res
-                    scriptSource = host
-                end
-            end)
-        end
-    end
-
-    -- 2. Nếu có sẵn file trong thư mục workspace của executor
-    if not scriptContent and isfile and readfile then
+    -- 1. Nếu đang bật DevMode (test local trên PC)
+    if _G.DevMode or _G.UseLocalServer then
         pcall(function()
-            if isfile(rawPath) then
-                local res = readfile(rawPath)
-                if res and #res > 100 then
-                    scriptContent = res
-                    scriptSource = "Local File"
-                end
+            local url = string.format("http://127.0.0.1:8000/%s%s", cleanPath, cacheBuster)
+            local res = game:HttpGet(url)
+            if res and #res > 100 and not res:find("404: Not Found") and not res:find("Error response") then
+                scriptContent = res
+                scriptSource = "Local Dev Server (127.0.0.1:8000)"
             end
         end)
     end
 
-    -- 3. Fallback nạp từ GitHub Production
+    -- 2. Ưu tiên nạp thẳng từ GitHub Production (Chạy 24/7 siêu tốc ~0.2s, không bị nghẽn timeout)
     if not scriptContent then
         pcall(function()
             local githubUrl = string.format("%s/%s%s", GITHUB_HOST, cleanPath, cacheBuster)
@@ -188,6 +167,31 @@ for _, rawPath in ipairs(detectedGameConfig.Paths or {}) do
             if res and #res > 100 and not res:find("404: Not Found") then
                 scriptContent = res
                 scriptSource = "GitHub Production"
+            end
+        end)
+    end
+
+    -- 3. Nếu executor có lưu sẵn file trong workspace
+    if not scriptContent and isfile and readfile then
+        pcall(function()
+            if isfile(rawPath) then
+                local res = readfile(rawPath)
+                if res and #res > 100 then
+                    scriptContent = res
+                    scriptSource = "Local Workspace File"
+                end
+            end
+        end)
+    end
+
+    -- 4. Fallback cuối cùng: Thử Localhost nếu chưa bật DevMode
+    if not scriptContent and not (_G.DevMode or _G.UseLocalServer) then
+        pcall(function()
+            local url = string.format("http://127.0.0.1:8000/%s%s", cleanPath, cacheBuster)
+            local res = game:HttpGet(url)
+            if res and #res > 100 and not res:find("404: Not Found") and not res:find("Error response") then
+                scriptContent = res
+                scriptSource = "Local Server"
             end
         end)
     end

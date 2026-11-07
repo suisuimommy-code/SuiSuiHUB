@@ -63,11 +63,6 @@ local function loadLibrary()
     pcall(function()
         library = loadstring(game:HttpGet("https://raw.githubusercontent.com/suisuimommy-code/SuiSuiHUB/main/inventory.lua"))()
     end)
-    if not library then
-        pcall(function()
-            library = loadstring(game:HttpGet("https://raw.githubusercontent.com/FZ8nj2VdyKq/inventory/main/ADS%20inventory.lua"))()
-        end)
-    end
     if not library and isfile and readfile and isfile("inventory.lua") then
         pcall(function()
             library = loadstring(readfile("inventory.lua"))()

@@ -160,7 +160,8 @@ _G.AnimeEyes_RebirthDelay = _G.AnimeEyes_RebirthDelay or 1.5
 -- Tab 3: Mở Trứng
 _G.AnimeEyes_AutoHatch = _G.AnimeEyes_AutoHatch or false
 _G.AnimeEyes_SelectedEgg = _G.AnimeEyes_SelectedEgg or "Starter Egg"
-_G.AnimeEyes_HatchAmount = _G.AnimeEyes_HatchAmount or 1
+_G.SuiSui_HatchAmount = tonumber(_G.SuiSui_HatchAmount) or 3
+_G.AnimeEyes_HatchAmount = _G.SuiSui_HatchAmount
 _G.AnimeEyes_AutoEquipBestPet = _G.AnimeEyes_AutoEquipBestPet or false
 
 -- Tab 4: Cửa Hàng
@@ -202,6 +203,11 @@ local function loadSettingsFromDisk()
                     elseif k == "AnimeEyes_AutoBoss" then
                         _G.SuiSui_AutoBoss = (v == true)
                         _G.AnimeEyes_AutoBoss = false
+                    elseif k == "AnimeEyes_HatchAmount" then
+                        -- Bỏ qua key cũ mặc định 1 trứng; dùng SuiSui_HatchAmount (mặc định 3 - HATCH x3)
+                    elseif k == "SuiSui_HatchAmount" then
+                        _G.SuiSui_HatchAmount = (tonumber(v) == 1) and 1 or 3
+                        _G.AnimeEyes_HatchAmount = _G.SuiSui_HatchAmount
                     else
                         _G[k] = v
                     end
@@ -767,12 +773,17 @@ SecEggsLeft:AddButton("Dịch Chuyển Đến Bệ Trứng Này Ngay", function(
     Notification("Bệ Trứng", string.format("Đã đến bệ %s tại Hub World %d!", eggData.name, targetWorld), 2)
 end)
 
-local HATCH_AMOUNTS = { "1 Trứng", "3 Trứng (Gamepass)", "8 Trứng (Gamepass)" }
-SecEggsLeft:AddDropdown("Số Lượng Mở Mỗi Lần", HATCH_AMOUNTS, "1 Trứng", false, function(v)
+local HATCH_AMOUNTS = { "HATCH x3 (Mở 3 Trứng)", "HATCH x1 (Mở 1 Trứng)" }
+local defaultHatchLabel = (tonumber(_G.SuiSui_HatchAmount) == 1) and "HATCH x1 (Mở 1 Trứng)" or "HATCH x3 (Mở 3 Trứng)"
+uiRegistry.dropdowns["SuiSui_HatchAmount"] = SecEggsLeft:AddDropdown("Số Lượng Mở Mỗi Lần", HATCH_AMOUNTS, defaultHatchLabel, false, function(v)
     local str = tostring(v)
-    if str:find("3") then _G.AnimeEyes_HatchAmount = 3
-    elseif str:find("8") then _G.AnimeEyes_HatchAmount = 8
-    else _G.AnimeEyes_HatchAmount = 1 end
+    if str:find("1") then
+        _G.SuiSui_HatchAmount = 1
+    else
+        _G.SuiSui_HatchAmount = 3
+    end
+    _G.AnimeEyes_HatchAmount = _G.SuiSui_HatchAmount
+    if queueAutoSave then queueAutoSave() end
 end)
 
 uiRegistry.toggles["AnimeEyes_AutoHatch"] = SecEggsLeft:AddToggle("Bật Tự Động Mở Trứng (Auto Hatch)", _G.AnimeEyes_AutoHatch, function(v)
@@ -1863,25 +1874,72 @@ triggerGuiButton = function(btn)
     if not btn then return false end
     local clicked = false
     local targets = { btn }
-    if btn.Parent and btn.Parent:IsA("GuiObject") then table.insert(targets, btn.Parent) end
+    if btn.Parent and btn.Parent:IsA("GuiObject") and btn.Parent.AbsoluteSize.X < 450 and btn.Parent.AbsoluteSize.Y < 180 then
+        table.insert(targets, btn.Parent)
+    end
     for _, desc in ipairs(btn:GetDescendants()) do
         if desc:IsA("GuiButton") or desc:IsA("TextLabel") or desc:IsA("Frame") then table.insert(targets, desc) end
     end
 
+    local btnCenter = Vector2.new(0, 0)
+    pcall(function()
+        if btn.AbsolutePosition and btn.AbsoluteSize then
+            btnCenter = btn.AbsolutePosition + (btn.AbsoluteSize / 2)
+        end
+    end)
+
     for _, t in ipairs(targets) do
         pcall(function()
+            if replicatesignal and t:IsA("GuiButton") then
+                pcall(replicatesignal, t.Activated)
+                pcall(replicatesignal, t.MouseButton1Click)
+                clicked = true
+            end
             if firesignal then
-                for _, ev in ipairs({"MouseButton1Click", "Activated", "MouseButton1Down", "MouseButton1Up"}) do
+                for _, ev in ipairs({"Activated", "MouseButton1Click", "MouseButton1Down", "MouseButton1Up"}) do
                     if t[ev] then pcall(firesignal, t[ev]); clicked = true end
                 end
             end
             if getconnections then
-                for _, ev in ipairs({"MouseButton1Click", "Activated", "MouseButton1Down", "MouseButton1Up", "InputBegan"}) do
+                for _, ev in ipairs({"Activated", "MouseButton1Click", "MouseButton1Down", "MouseButton1Up"}) do
                     local sig = t[ev]
                     if sig then
                         for _, conn in ipairs(getconnections(sig) or {}) do
-                            if conn.Fire then pcall(conn.Fire, conn); clicked = true
-                            elseif conn.Function then pcall(conn.Function); clicked = true end
+                            if conn.Fire then pcall(conn.Fire, conn); clicked = true end
+                            if conn.Function then pcall(conn.Function); clicked = true end
+                        end
+                    end
+                end
+                for _, ev in ipairs({"InputBegan", "InputEnded"}) do
+                    local sig = t[ev]
+                    if sig then
+                        local uState = (ev == "InputBegan") and Enum.UserInputState.Begin or Enum.UserInputState.End
+                        local posVec = Vector3.new(btnCenter.X, btnCenter.Y, 0)
+                        local mockMouse = {
+                            UserInputType = Enum.UserInputType.MouseButton1,
+                            UserInputState = uState,
+                            Position = posVec,
+                            Delta = Vector3.zero,
+                            KeyCode = Enum.KeyCode.Unknown
+                        }
+                        local mockTouch = {
+                            UserInputType = Enum.UserInputType.Touch,
+                            UserInputState = uState,
+                            Position = posVec,
+                            Delta = Vector3.zero,
+                            KeyCode = Enum.KeyCode.Unknown
+                        }
+                        for _, conn in ipairs(getconnections(sig) or {}) do
+                            if conn.Fire then
+                                pcall(conn.Fire, conn, mockMouse, false)
+                                pcall(conn.Fire, conn, mockTouch, false)
+                                clicked = true
+                            end
+                            if conn.Function then
+                                pcall(conn.Function, mockMouse, false)
+                                pcall(conn.Function, mockTouch, false)
+                                clicked = true
+                            end
                         end
                     end
                 end
@@ -1902,10 +1960,11 @@ triggerGuiButton = function(btn)
                     return
                 end
             end
+            local clickX = center.X + (inset.X or 0)
             local clickY = (center.Y < 0) and math.max(center.Y + inset.Y, 18) or (center.Y + inset.Y)
-            vim:SendMouseButtonEvent(center.X, clickY, 0, true, game, 1)
+            vim:SendMouseButtonEvent(clickX, clickY, 0, true, game, 1)
             task.wait(0.03)
-            vim:SendMouseButtonEvent(center.X, clickY, 0, false, game, 1)
+            vim:SendMouseButtonEvent(clickX, clickY, 0, false, game, 1)
             clicked = true
         end
     end)
@@ -2636,9 +2695,80 @@ task.spawn(function()
     end
 end)
 
+do
+local function isEggGuiVisible(obj)
+    if not obj or not obj:IsA("GuiObject") then return false end
+    if obj.AbsoluteSize.X <= 4 or obj.AbsoluteSize.Y <= 4 then return false end
+    local curr = obj
+    while curr do
+        if curr:IsA("GuiObject") and not curr.Visible then return false end
+        if curr:IsA("LayerCollector") then
+            if not curr.Enabled then return false end
+            break
+        end
+        curr = curr.Parent
+    end
+    return true
+end
+
+local function clickEggPopupHatchButton(preferredCount)
+    local clickedAny = false
+    pcall(function()
+        local pg = localPlayer:FindFirstChild("PlayerGui")
+        if not pg then return end
+
+        local wantX3 = (tonumber(preferredCount) or 3) >= 3
+        local x3Buttons = {}
+        local x1Buttons = {}
+        local seenContainers = {}
+
+        for _, desc in ipairs(pg:GetDescendants()) do
+            if (desc:IsA("TextLabel") or desc:IsA("TextButton")) and isEggGuiVisible(desc) then
+                local rawTxt = tostring(desc.Text or ""):upper():gsub("%s+", " "):gsub("^%s*(.-)%s*$", "%1")
+                if #rawTxt > 0 and not rawTxt:find("DELETE") and not rawTxt:find("ROBUX") and not rawTxt:find("") then
+                    local isX3 = (rawTxt == "HATCH X3" or rawTxt:find("HATCH%s*X%s*3") ~= nil)
+                    local isX1 = (rawTxt == "HATCH X1" or rawTxt:find("HATCH%s*X%s*1") ~= nil)
+                    if isX3 or isX1 then
+                        local btnContainer = nil
+                        if desc:IsA("GuiButton") then
+                            btnContainer = desc
+                        elseif desc.Parent and desc.Parent:IsA("GuiButton") then
+                            btnContainer = desc.Parent
+                        elseif desc.Parent and desc.Parent.Parent and desc.Parent.Parent:IsA("GuiButton") then
+                            btnContainer = desc.Parent.Parent
+                        elseif desc.Parent then
+                            btnContainer = desc.Parent:FindFirstChildWhichIsA("GuiButton") or desc.Parent
+                        else
+                            btnContainer = desc
+                        end
+
+                        if btnContainer and not seenContainers[btnContainer] then
+                            seenContainers[btnContainer] = true
+                            if isX3 then
+                                table.insert(x3Buttons, btnContainer)
+                            else
+                                table.insert(x1Buttons, btnContainer)
+                            end
+                        end
+                    end
+                end
+            end
+        end
+
+        local targetList = wantX3 and (#x3Buttons > 0 and x3Buttons or x1Buttons) or (#x1Buttons > 0 and x1Buttons or x3Buttons)
+        for _, btn in ipairs(targetList) do
+            if triggerGuiButton(btn) then
+                clickedAny = true
+            end
+        end
+    end)
+    return clickedAny
+end
+
+local lastEquipBestTick = 0
 task.spawn(function()
     while isSessionActive() do
-        if _G.AnimeEyes_AutoHatch then
+        if _G.AnimeEyes_AutoHatch and not (_G.SuiSui_AutoBoss and _G.AnimeEyes_InBossFight) then
             pcall(function()
                 local char = localPlayer.Character
                 local root = char and char:FindFirstChild("HumanoidRootPart")
@@ -2649,35 +2779,48 @@ task.spawn(function()
                 local eggData = getSelectedCupEggData and getSelectedCupEggData(targetWorld)
                 if not eggData then return end
 
-                local count = tonumber(_G.AnimeEyes_HatchAmount) or 1
+                local count = tonumber(_G.SuiSui_HatchAmount) or tonumber(_G.AnimeEyes_HatchAmount) or 3
                 local standPos = worldOrigin + eggData.offset + Vector3.new(0, 1.2, 0)
-                if (root.Position - standPos).Magnitude > 6.5 then
+                if (root.Position - standPos).Magnitude > 5.5 then
                     root.CFrame = CFrame.new(standPos)
                     root.Velocity = Vector3.zero
-                    task.wait(0.3)
+                    task.wait(0.25)
                 end
 
-                if openEggRemote then
-                    if openEggRemote:IsA("RemoteFunction") then openEggRemote:InvokeServer(eggData.name, count)
-                    else openEggRemote:FireServer(eggData.name, count) end
-                end
-                if petActionRemote then
-                    pcall(function()
-                        if petActionRemote:IsA("RemoteFunction") then petActionRemote:InvokeServer("Hatch", eggData.name, count)
-                        else petActionRemote:FireServer("Hatch", eggData.name, count) end
+                -- 1. Ưu tiên bấm trực tiếp nút HATCH x3 (hoặc HATCH x1) trên bảng trứng đang mở (Void Egg, v.v.)
+                local clickedPopup = clickEggPopupHatchButton(count)
+
+                -- 2. Gửi kèm Remote dự phòng không chặn luồng nếu bảng trứng chưa kịp hiện
+                if not clickedPopup and petActionRemote then
+                    task.spawn(function()
+                        pcall(function()
+                            if petActionRemote:IsA("RemoteFunction") then
+                                petActionRemote:InvokeServer("hatch", eggData.id or eggData.name, count)
+                                petActionRemote:InvokeServer("Hatch", eggData.name, count)
+                            else
+                                petActionRemote:FireServer("hatch", eggData.id or eggData.name, count)
+                                petActionRemote:FireServer("Hatch", eggData.name, count)
+                            end
+                        end)
                     end)
                 end
-                if _G.AnimeEyes_AutoEquipBestPet and petActionRemote then
-                    pcall(function()
-                        if petActionRemote:IsA("RemoteFunction") then petActionRemote:InvokeServer("EquipBest")
-                        else petActionRemote:FireServer("EquipBest") end
+
+                -- 3. Tự động trang bị Pet mạnh nhất (mỗi 2.5s để không làm nghẽn tốc độ bấm HATCH x3)
+                if _G.AnimeEyes_AutoEquipBestPet and petActionRemote and (os.clock() - lastEquipBestTick >= 2.5) then
+                    lastEquipBestTick = os.clock()
+                    task.spawn(function()
+                        pcall(function()
+                            if petActionRemote:IsA("RemoteFunction") then petActionRemote:InvokeServer("EquipBest")
+                            else petActionRemote:FireServer("EquipBest") end
+                        end)
                     end)
                 end
             end)
         end
-        task.wait(0.4)
+        task.wait(0.3)
     end
 end)
+end
 
 -- ========================================================================
 -- 13. HỆ THỐNG CỬA HÀNG HOÀN CHỈNH (MY EYES, AURAS, BOSS SHOP & REWARDS)
@@ -3105,7 +3248,7 @@ local CONFIG_KEYS = {
     "AnimeEyes_AutoClick", "AnimeEyes_TargetCPS", "AnimeEyes_BypassCooldown",
     "AnimeEyes_AutoSkills", "AnimeEyes_KeepFreeOn", "AnimeEyes_AutoRebirth",
     "AnimeEyes_RebirthDelay", "AnimeEyes_AutoHatch", "AnimeEyes_SelectedEgg",
-    "AnimeEyes_HatchAmount", "AnimeEyes_AutoEquipBestPet", "AnimeEyes_AutoUnlockEyes",
+    "SuiSui_HatchAmount", "AnimeEyes_AutoEquipBestPet", "AnimeEyes_AutoUnlockEyes",
     "AnimeEyes_AutoEquipBestEye", "AnimeEyes_AutoRollAuras", "AnimeEyes_AutoEquipBestAura",
     "AnimeEyes_AutoClaims", "WalkSpeedEnabled", "WalkSpeedValue",
     "AntiAFK", "WhiteScreen", "DisableConsoleLogs"

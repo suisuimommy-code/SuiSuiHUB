@@ -7,30 +7,25 @@ RaidSelection = {}
 
 if game.PlaceId == 6938803436 or game.PlaceId == 6990129309 or game.PlaceId == 6990133340 or game.PlaceId == 6990131029 or game.PlaceId == 7338881230 or game.PlaceId == 7274690025 or game.GameId == 2712497672 then
     local library
-    -- 1. Ưu tiên nạp UI Library từ GitHub chính thức (chạy 24/7 độc lập)
+    -- 1. Nạp trực tiếp từ GitHub chính thức của dj (Chạy 24/7 độc lập 100%)
     pcall(function()
         library = loadstring(game:HttpGet("https://raw.githubusercontent.com/suisuimommy-code/SuiSuiHUB/main/inventory.lua"))()
     end)
-    -- 2. Fallback Local Server khi test trên PC
+    -- 2. Nạp từ file cục bộ nếu executor lưu sẵn inventory.lua
+    if not library and isfile and readfile and isfile("inventory.lua") then
+        pcall(function()
+            library = loadstring(readfile("inventory.lua"))()
+        end)
+    end
+    -- 3. Fallback Local Server khi test trên PC
     if not library then
         pcall(function()
             library = loadstring(game:HttpGet("http://127.0.0.1:8000/inventory.lua"))()
         end)
     end
-    if not library then
-        pcall(function()
-            library = loadstring(game:HttpGet("http://127.0.0.1:8000/anime%20dimesion/ADS%20inventory.lua"))()
-        end)
-    end
-    -- 3. Fallback online dự phòng
-    if not library then
-        pcall(function()
-            library = loadstring(game:HttpGet("https://raw.githubusercontent.com/FZ8nj2VdyKq/inventory/main/ADS%20inventory.lua"))()
-        end)
-    end
 
     if not library then
-        warn("[SuiSuiHUB] Không thể nạp thư viện UI inventory.lua!")
+        warn("[SuiSuiHUB] Không thể nạp thư viện UI inventory.lua từ GitHub của dj!")
         return
     end
     local function getGMT7Time(fmt)
